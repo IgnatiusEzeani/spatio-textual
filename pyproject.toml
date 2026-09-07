@@ -12,7 +12,8 @@ authors = [{ name = "Ignatius Ezeani", email = "i.ezeani@lancaster.ac.uk" }]
 license = { text = "MIT" }
 keywords = ["nlp", "digital humanities", "spatial humanities", "annotation", "testimonies", "geography"]
 dependencies = [
-  "spacy>=3.6,<4.0",
+  "spacy>=3.6,<3.8; python_version < '3.10'",
+  "spacy>=3.8,<4.0; python_version >= '3.10'",
   "pandas>=2.0",
   "geonamescache>=2.0.0",
 ]
