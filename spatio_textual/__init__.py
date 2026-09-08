@@ -24,6 +24,14 @@ from .evaluation import (
     reference_spatial_reach,
     supported_reference_fraction,
 )
+from .journeys import (
+    JOURNEY_FIELDS,
+    JourneyExtractor,
+    build_journey_prompt,
+    journey_field_status_counts,
+    normalise_model_journey,
+    validate_runtime_journey,
+)
 
 __all__ = [
     "Annotator", "load_spacy_model", "split_into_segments", "save_annotations", "load_annotations",
@@ -34,4 +42,6 @@ __all__ = [
     "RuleGazetteerAnnotator", "load_teaching_gazetteer", "filter_supported_gold_labels",
     "MODEL_TO_GOLD_LABEL", "harmonize_ner_entities", "label_inventory", "reference_spans_for_ner",
     "reference_spatial_reach", "supported_reference_fraction",
+    "JOURNEY_FIELDS", "JourneyExtractor", "build_journey_prompt", "normalise_model_journey",
+    "validate_runtime_journey", "journey_field_status_counts",
 ]
