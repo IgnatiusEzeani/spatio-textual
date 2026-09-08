@@ -16,6 +16,14 @@ from .gold import (
     validate_gold_records,
 )
 from .rules import RuleGazetteerAnnotator, filter_supported_gold_labels, load_teaching_gazetteer
+from .evaluation import (
+    MODEL_TO_GOLD_LABEL,
+    harmonize_ner_entities,
+    label_inventory,
+    reference_spans_for_ner,
+    reference_spatial_reach,
+    supported_reference_fraction,
+)
 
 __all__ = [
     "Annotator", "load_spacy_model", "split_into_segments", "save_annotations", "load_annotations",
@@ -24,4 +32,6 @@ __all__ = [
     "SPAN_LABELS", "load_gold_jsonl", "validate_gold_record", "validate_gold_records", "assert_valid_gold",
     "find_span", "score_span_annotations", "score_relation_annotations", "select_spans",
     "RuleGazetteerAnnotator", "load_teaching_gazetteer", "filter_supported_gold_labels",
+    "MODEL_TO_GOLD_LABEL", "harmonize_ner_entities", "label_inventory", "reference_spans_for_ner",
+    "reference_spatial_reach", "supported_reference_fraction",
 ]
