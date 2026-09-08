@@ -15,6 +15,7 @@ from .gold import (
     validate_gold_record,
     validate_gold_records,
 )
+from .rules import RuleGazetteerAnnotator, filter_supported_gold_labels, load_teaching_gazetteer
 
 __all__ = [
     "Annotator", "load_spacy_model", "split_into_segments", "save_annotations", "load_annotations",
@@ -22,4 +23,5 @@ __all__ = [
     "NER_MODELS", "SENTIMENT_MODELS", "EMOTION_MODELS", "LLM_PROVIDERS",
     "SPAN_LABELS", "load_gold_jsonl", "validate_gold_record", "validate_gold_records", "assert_valid_gold",
     "find_span", "score_span_annotations", "score_relation_annotations", "select_spans",
+    "RuleGazetteerAnnotator", "load_teaching_gazetteer", "filter_supported_gold_labels",
 ]
