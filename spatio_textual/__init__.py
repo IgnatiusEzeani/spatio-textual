@@ -32,6 +32,7 @@ from .journeys import (
     normalise_model_journey,
     validate_runtime_journey,
 )
+from .review import HUMAN_STATUSES, REVIEW_REASONS, apply_human_review, human_correction_burden
 
 __all__ = [
     "Annotator", "load_spacy_model", "split_into_segments", "save_annotations", "load_annotations",
@@ -44,4 +45,5 @@ __all__ = [
     "reference_spatial_reach", "supported_reference_fraction",
     "JOURNEY_FIELDS", "JourneyExtractor", "build_journey_prompt", "normalise_model_journey",
     "validate_runtime_journey", "journey_field_status_counts",
+    "HUMAN_STATUSES", "REVIEW_REASONS", "apply_human_review", "human_correction_burden",
 ]
