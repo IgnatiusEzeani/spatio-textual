@@ -1,16 +1,22 @@
 # SH2026 Full-Day Colab Workshop
 
-Working title: **AI and NLP for Spatial Humanities: From Text to Interpretable Spatial Narratives**
+Official title: **AI and NLP for Spatial Humanities: From Manual Annotation to LLM-Assisted Interpretation**
+
+Keynote companion: **From Coordinates to Context: Rethinking Spatial Humanities in the Age of Large Language Models**
 
 ## Teaching philosophy
 
-This is not a package walkthrough. Participants should understand what each methodological family can and cannot do, then use `spatio-textual` as the shared implementation environment.
+This is not a package walkthrough and not an argument that newer methods simply replace older ones. Participants should understand what each methodological family can and cannot represent, then use `spatio-textual` as the shared implementation environment.
 
 The workshop follows one repeated pattern:
 
 `source text -> method -> output -> error/disagreement -> validation -> interpretation`
 
-Every notebook should run independently after the setup notebook and should contain precomputed fallback outputs for heavyweight/API-dependent sections.
+Across the day, the methodological sequence is:
+
+`manual annotation -> rules/gazetteers -> contextual NLP -> entity resolution -> affect/events -> evidence-first LLM extraction -> adjudication -> mapping -> responsible Spatial AI`
+
+Every notebook should run independently after setup and should contain or point to a fallback path for heavyweight/API-dependent sections.
 
 ## Audience assumptions
 
@@ -27,174 +33,136 @@ By the end of the day, participants should be able to:
 1. explain why spatial information in text extends beyond named mappable places;
 2. manually define and annotate a small spatial-information task;
 3. compare rule/gazetteer, spaCy and transformer NER approaches;
-4. identify the difference between entity recognition and entity resolution;
+4. distinguish recognition, resolution, relation and interpretation;
 5. inspect ambiguity and model disagreement rather than hiding them;
 6. compare rule, HF and LLM-capable affect pipelines critically;
 7. understand schema-constrained LLM extraction and evidence requirements;
 8. construct and inspect structured journey records;
-9. export auditable annotations to JSONL/CSV/GeoJSON;
-10. explain when human review is necessary in Spatial AI workflows.
+9. record human accept/edit/reject decisions in an auditable way;
+10. export auditable annotations to JSONL/CSV/GeoJSON;
+11. explain why some spatial evidence should not be forced onto a point map;
+12. document provenance, uncertainty, model drift and data-governance constraints.
 
-## Notebook sequence
+## Notebook status
 
-### `00_setup_and_orientation.ipynb`
+| Notebook | Topic | Status |
+|---|---|---|
+| `00_setup_and_orientation.ipynb` | Setup, location/locale/sense of place, common schema | Implemented |
+| `01_manual_annotation.ipynb` | Human reference annotation and disagreement | Implemented |
+| `02_rules_and_gazetteers.ipynb` | Deterministic baseline and rule failure analysis | Implemented |
+| `03_contextual_ner.ipynb` | spaCy/HF NER, ontology ceiling, representational reach | Implemented |
+| `04_linking_and_ambiguity.ipynb` | Entity resolution, ambiguity, historical geography | Implemented |
+| `05_affect_and_events.ipynb` | Sentiment, emotion and narrator-centred events | Implemented |
+| `06_llm_structured_extraction.ipynb` | Evidence-first structured journey extraction | Implemented |
+| `07_compare_and_adjudicate.ipynb` | Model disagreement, human review and correction burden | Implemented |
+| `08_from_text_to_map.ipynb` | Entity/journey GeoJSON, route audit and mapping | Implemented |
+| `09_responsible_spatial_ai.ipynb` | Provenance, uncertainty, governance and release audit | Implemented |
 
-**Duration:** 30 minutes
+**Important:** “Implemented” means the notebook content and code path exist. It does not yet mean every notebook has passed a fresh Google Colab smoke test or has its final precomputed heavyweight-model outputs.
 
-Contents:
+## Notebook sequence and teaching messages
 
-- workshop goals;
-- Spatial Humanities framing: location, locale, sense of place;
-- clone/install lightweight requirements;
-- import package;
-- verify environment;
-- load teaching examples;
-- explain common schema;
-- show final end-to-end output so participants know where the day is going.
+### 00 · Setup and orientation — 30 min
 
-No GPU/API key required.
+- Spatial Humanities framing: location, locale and sense of place;
+- install the SH2026 branch;
+- load public-safe teaching examples;
+- introduce the common audit schema;
+- show the end-to-end destination.
 
-### `01_manual_annotation.ipynb`
+**Message:** spatial information in text is broader than named coordinates.
 
-**Duration:** 35 minutes
+### 01 · Manual annotation — 35 min
 
-Contents:
+- annotate places, geo-nouns, relations, distance/time and subjective descriptors;
+- compare participant judgements with a documented reference;
+- expose span, ontology and selection disagreement.
 
-- one short Lake District passage;
-- participant annotation of place names, geo-nouns, spatial relations, distance/time and subjective descriptors;
-- compare participant decisions with an instructor reference;
-- introduce inter-annotator disagreement and ontology design.
+**Message:** human annotation is interpretive too.
 
-Key message: **human annotation is interpretive too.**
+### 02 · Rules and gazetteers — 45 min
 
-### `02_rules_and_gazetteers.ipynb`
-
-**Duration:** 45 minutes
-
-Contents:
-
-- EntityRuler/project resources;
-- deterministic matching;
-- inspect successful cases;
-- deliberately test spelling variation, unseen terms, ambiguous names and relational language;
+- bounded gazetteer/project resources;
+- deterministic EntityRuler/regex baseline;
+- inspect successful cases and brittle failures;
 - record latency and coverage.
 
-Key message: **transparent and reproducible does not mean complete.**
+**Message:** transparent and reproducible does not mean complete.
 
-### `03_contextual_ner.ipynb`
+### 03 · Contextual NER — 55 min
 
-**Duration:** 55 minutes
-
-Contents:
-
-- spaCy small vs transformer model;
+- separate contextual spaCy NER from spaCy + project resources;
 - optional HF NER comparison;
-- place/entity label differences;
-- precision/recall/F1 on a small reference set;
-- inspect false positives/negatives;
-- model telemetry.
+- harmonise labels for evaluation;
+- distinguish within-ontology accuracy from representational reach.
 
-Heavy models should have precomputed outputs available.
+**Message:** context helps, but the training ontology still constrains what the model can see.
 
-Key message: **context helps, but the model's training ontology still constrains what it can see.**
+### 04 · Linking, ambiguity and historical geography — 40 min
 
-### `04_linking_and_ambiguity.ipynb`
-
-**Duration:** 40 minutes
-
-Contents:
-
-- NER vs entity linking;
-- offline GeoResolver;
+- NER vs entity resolution;
+- offline `GeoResolver`;
 - candidate ambiguity;
-- examples such as common city names and historical polities;
-- why original strings must be preserved;
-- human review exercise.
+- historical polities such as `Czechoslovakia` preserved rather than silently modernised;
+- append-only review exercise.
 
-Key message: **a coordinate is an interpretation, not simply an annotation.**
+**Message:** a coordinate is an interpretation, not simply an annotation.
 
-### `05_affect_and_events.ipynb`
+### 05 · Affect and narrator-centred events — 50 min
 
-**Duration:** 50 minutes
+- sentiment and emotion rule baselines;
+- inspect the lexical cues driving classifications;
+- demonstrate domain-assumption leakage;
+- optional HF comparison;
+- narrator-centred movement/action events;
+- narrative-sequence plot.
 
-Contents:
+**Message:** model-labelled affect is an analytical signal, not psychological ground truth.
 
-- sentiment rule baseline;
-- emotion rule baseline;
-- HF classifiers;
-- optional LLM comparison;
-- narrator-centred actions/events;
-- narrative sequence plot;
-- disagreement/error analysis.
+### 06 · Evidence-first LLM structured extraction — 60 min
 
-Explicitly discuss the limits of emotion taxonomies and avoid presenting labels as psychological ground truth.
+- inspect the journey JSON contract;
+- require verbatim source evidence;
+- compute offsets locally rather than trusting model-generated offsets;
+- distinguish `explicit`, `contextual_inference` and `missing`;
+- demonstrate unsupported evidence and invalid-schema handling;
+- optional live provider call;
+- preserve `null` when the source is silent.
 
-Key message: **richer annotation creates richer questions and richer risks.**
+**Message:** the useful LLM pattern is constrained extraction + evidence + validation, not fluent generation.
 
-### `06_llm_structured_extraction.ipynb`
+### 07 · Compare, disagree and adjudicate — 45 min
 
-**Duration:** 60 minutes
+- model voting without erasing disagreement;
+- accept/edit/reject review events;
+- review burden vs correction burden;
+- tidy comparison-table skeleton for benchmark/keynote use.
 
-Contents:
+**Message:** there is no single method winner across all dimensions.
 
-- why unconstrained prompting is insufficient;
-- JSON schema design;
-- extract one structured spatial relation/journey;
-- require evidence quote;
-- validate evidence against source text;
-- mark fields explicit vs contextual inference vs missing;
-- retry/parse failures;
-- optional live provider call plus precomputed outputs.
+### 08 · From text to map — 35–45 min
 
-Key message: **the useful LLM pattern is constrained extraction + evidence + validation, not fluent generation.**
+- point GeoJSON;
+- auditable journey route GeoJSON;
+- ambiguous/unresolved route audit;
+- interactive Folium map;
+- textual nearness vs Euclidean distance;
+- co-occurrence as a non-route representation;
+- spatial evidence that should not be forced onto a point map.
 
-### `07_compare_and_adjudicate.ipynb`
+**Message:** mapping is one possible representation of spatial evidence, not its endpoint.
 
-**Duration:** 45 minutes
+### 09 · Responsible Spatial AI — 20–30 min
 
-Contents:
+- secret-safe run manifests and input hashes;
+- uncertainty in exported data;
+- public vs restricted material;
+- model/provider drift;
+- human-review triggers;
+- multidimensional benchmark criteria;
+- final release checklist.
 
-- run rules/spaCy/HF/LLM outputs on matched examples;
-- create a side-by-side comparison table;
-- use existing adjudication for NER;
-- surface disagreements;
-- participant accepts/edits/rejects selected outputs;
-- measure human correction burden.
-
-Key message: **there is no single method winner across all dimensions.**
-
-### `08_from_text_to_map.ipynb`
-
-**Duration:** 45 minutes
-
-Contents:
-
-- GeoJSON export;
-- interactive point map;
-- co-occurrence network;
-- simple route/journey visualisation;
-- compare textual nearness with Euclidean proximity on Lake District examples;
-- discuss non-cartographic place references that should not be forced onto a map.
-
-Key message: **mapping is one possible representation of spatial evidence, not its endpoint.**
-
-### `09_responsible_spatial_ai.ipynb`
-
-**Duration:** 30 minutes
-
-Contents:
-
-- provenance;
-- uncertainty;
-- provider/model drift;
-- reproducibility;
-- privacy and controlled collections;
-- cultural/geographic bias;
-- cost/latency;
-- human-in-the-loop design;
-- final reusable checklist.
-
-Key message: **the more interpretive power we delegate to AI, the stronger the audit trail must become.**
+**Message:** the more interpretive power delegated to AI, the stronger the audit trail must become.
 
 ## Proposed day schedule
 
@@ -214,51 +182,25 @@ Key message: **the more interpretive power we delegate to AI, the stronger the a
 | 16:50-17:25 | Text to map |
 | 17:25-17:45 | Responsible Spatial AI + wrap-up |
 
+The schedule is deliberately modular. If earlier discussion runs long, Notebook 09 can be used as a concise closing checklist and parts of Notebook 08 can be demonstrated rather than completed hands-on.
+
 ## Teaching datasets
 
 ### Primary
 
-Lake District texts/examples that can be distributed under their source terms.
-
-Use these for:
-
-- place names;
-- geo-nouns;
-- `picturesque`/`wild` descriptors;
-- nearness expressions;
-- map comparison.
+Lake District examples that can be distributed under their source terms. Use these for named places, geo-nouns, landscape descriptors, textual nearness and map comparison.
 
 ### Secondary
 
-Instructor-created oral-history-style examples with Q/A structure, movement, ambiguity and affect.
+Instructor-created public-safe oral-history/travel examples with Q/A structure, movement, ambiguity, affect and missing fields.
 
 ### Research demonstration only
 
-Controlled-access Holocaust testimony results should be represented through:
-
-- aggregate statistics;
-- diagrams;
-- schemas;
-- precomputed/cleared examples where permitted.
-
-Do not bundle controlled transcripts in public notebooks.
-
-## Colab reliability requirements
-
-Every notebook must:
-
-- run on CPU unless explicitly marked optional;
-- have a `FAST_MODE = True` default;
-- avoid requiring a participant API key;
-- load precomputed results if optional models/providers are unavailable;
-- include a `Reset`/re-run-safe workflow;
-- avoid writing secrets to notebook output;
-- use small examples for live heavy-model comparison;
-- finish its default path in a predictable time.
+Controlled-access Holocaust testimony results should be represented through aggregate statistics, diagrams, schemas and cleared/precomputed material where permitted. Do **not** bundle controlled transcripts in the public notebooks or repository.
 
 ## Shared outputs
 
-Notebooks should write under:
+Notebooks write under:
 
 ```text
 sh2026_outputs/
@@ -269,19 +211,39 @@ sh2026_outputs/
   human_review/
 ```
 
-These outputs should use the schema in `docs/sh2026/COMMON_SCHEMA.md` so selected figures/tables can be reused directly in the Streamlit demo and keynote.
+Outputs should follow `docs/sh2026/COMMON_SCHEMA.md` so selected tables and figures can be reused directly in the hosted demo and keynote.
 
-## Instructor package
+## Colab reliability requirements
 
-Create before release:
+Before release, every notebook must:
+
+- run on CPU on its default path unless clearly marked optional;
+- avoid requiring a participant API key;
+- skip or use documented precomputed outputs when optional models/providers are unavailable;
+- be safe to re-run from the top;
+- avoid printing or persisting secrets;
+- record model/backend/version information for empirical outputs;
+- use small examples for live heavyweight comparison;
+- finish its default path in a predictable time.
+
+## Instructor package still required
+
+Before the workshop release candidate, create:
 
 - `INSTRUCTOR_GUIDE.md`;
 - expected outputs/reference annotations;
-- precomputed model outputs;
+- precomputed transformer/LLM outputs with provenance manifests;
 - troubleshooting guide;
-- offline fallback zip;
-- 5-minute and 15-minute contingency exercises if timings slip.
+- offline/lightweight fallback package;
+- 5-minute and 15-minute contingency exercises;
+- clean-Colab smoke-test record.
 
-## Next implementation step
+## Immediate next implementation block
 
-Build `00_setup_and_orientation.ipynb`, `01_manual_annotation.ipynb` and `02_rules_and_gazetteers.ipynb` first. They establish the vocabulary and guarantee a useful workshop even if every optional AI service fails.
+1. Run CI after the new review/provenance/journey-mapping utilities.
+2. Smoke-test notebooks `00`–`09` from clean environments, prioritising their CPU/default paths.
+3. Freeze a held-out benchmark set before further method/prompt tuning.
+4. Build the benchmark runner and first empirical keynote figures.
+5. Refactor the Streamlit app around **Home / Annotate / Compare / Explore / Review / About** using the same review, provenance and journey-mapping utilities.
+
+The workshop core is now structurally complete; the next phase is **validation, benchmarking, fallback generation and demo integration**.
