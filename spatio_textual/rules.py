@@ -25,10 +25,16 @@ TRANSPORT_PATTERNS = (
     r"\bby\s+(train|bus|car|lorry|truck|boat|ship|plane|air|foot|bicycle)\b",
     r"\bon\s+foot\b",
 )
+# Historical/travel prose often spells small quantities out (e.g. "six miles").
+# Keeping this vocabulary explicit preserves the inspectability of the rule baseline.
+NUMBER_EXPRESSION = (
+    r"(?:\d+(?:\.\d+)?|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)"
+)
 DISTANCE_PATTERN = re.compile(
-    r"\b(?:(?:about|approximately|roughly|nearly|around)\s+)?"
-    r"\d+(?:\.\d+)?\s+"
-    r"(?:mile|miles|kilometre|kilometres|kilometer|kilometers|km)"
+    rf"\b(?:(?:about|approximately|roughly|nearly|around)\s+)?"
+    rf"{NUMBER_EXPRESSION}\s+"
+    r"(?:miles?|kilometres?|kilometers?|km)"
     r"(?:\s+distant)?\b",
     flags=re.IGNORECASE,
 )
