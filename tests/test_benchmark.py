@@ -95,4 +95,37 @@ def test_aggregate_comparison_rows_ignores_null_numeric_values():
     agg = aggregate_comparison_rows(rows)[0]
     assert agg["examples"] == 2
     assert agg["f1"] == 0.9
+    assert agg["f1_macro"] == 0.9
     assert agg["coverage"] == 0.5
+    assert agg["f1_micro"] is None
+
+
+def test_aggregate_comparison_rows_reports_micro_and_macro_separately():
+    rows = [
+        {
+            "method": "ner", "task": "toponym", "backend": "spacy", "model": "m",
+            "precision": 1.0, "recall": 0.5, "f1": 0.666667,
+            "tp": 1, "fp": 0, "fn": 1,
+            "latency_ms": 10.0, "cost_usd_est": 0.001,
+        },
+        {
+            "method": "ner", "task": "toponym", "backend": "spacy", "model": "m",
+            "precision": 0.5, "recall": 1.0, "f1": 0.666667,
+            "tp": 2, "fp": 2, "fn": 0,
+            "latency_ms": 20.0, "cost_usd_est": 0.002,
+        },
+    ]
+    agg = aggregate_comparison_rows(rows)[0]
+    assert agg["precision_macro"] == 0.75
+    assert agg["recall_macro"] == 0.75
+    assert agg["f1_macro"] == 0.666667
+    assert agg["tp_total"] == 3
+    assert agg["fp_total"] == 2
+    assert agg["fn_total"] == 1
+    assert agg["precision_micro"] == 0.6
+    assert agg["recall_micro"] == 0.75
+    assert agg["f1_micro"] == 0.666667
+    assert agg["latency_ms_mean_per_example"] == 15.0
+    assert agg["latency_ms_total"] == 30.0
+    assert agg["cost_usd_est_mean_per_example"] == 0.0015
+    assert agg["cost_usd_est_total"] == 0.003
