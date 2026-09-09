@@ -156,18 +156,56 @@ def journey_comparison_row(
     }
 
 
+def _micro_scores(group: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Return pooled span scores when rows expose integer TP/FP/FN counts."""
+    scored = [
+        row for row in group
+        if all(isinstance(row.get(field), int) for field in ("tp", "fp", "fn"))
+    ]
+    if not scored:
+        return {
+            "tp_total": None,
+            "fp_total": None,
+            "fn_total": None,
+            "precision_micro": None,
+            "recall_micro": None,
+            "f1_micro": None,
+        }
+    tp = sum(int(row["tp"]) for row in scored)
+    fp = sum(int(row["fp"]) for row in scored)
+    fn = sum(int(row["fn"]) for row in scored)
+    precision = tp / (tp + fp) if tp + fp else 1.0
+    recall = tp / (tp + fn) if tp + fn else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {
+        "tp_total": tp,
+        "fp_total": fp,
+        "fn_total": fn,
+        "precision_micro": round(precision, 6),
+        "recall_micro": round(recall, 6),
+        "f1_micro": round(f1, 6),
+    }
+
+
 def aggregate_comparison_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Aggregate numeric comparison fields by method/task without zero-filling nulls."""
+    """Aggregate comparison rows with explicit macro/micro and telemetry semantics.
+
+    Backwards-compatible ``precision``/``recall``/``f1`` remain macro means over
+    examples. For span tasks, pooled ``*_micro`` metrics are also returned from
+    summed TP/FP/FN. Latency and cost expose both mean-per-example and total
+    values so keynote figures cannot accidentally describe a mean as a total.
+    Null values remain null rather than being zero-filled.
+    """
     items = list(rows)
     groups: dict[tuple[str, str, str, str | None], list[dict[str, Any]]] = {}
     for row in items:
         key = (str(row.get("method")), str(row.get("task")), str(row.get("backend")), row.get("model"))
         groups.setdefault(key, []).append(row)
 
-    numeric_fields = (
+    mean_fields = (
         "precision", "recall", "f1", "coverage", "unsupported_rate", "ambiguous_rate",
-        "human_edits_required", "latency_ms", "cost_usd_est", "evidence_grounded_rate",
-        "requires_review_rate", "contextual_inference_rate", "field_contextual_inference_rate",
+        "human_edits_required", "evidence_grounded_rate", "requires_review_rate",
+        "contextual_inference_rate", "field_contextual_inference_rate",
     )
     out: list[dict[str, Any]] = []
     for (method, task, backend, model), group in sorted(groups.items()):
@@ -177,9 +215,27 @@ def aggregate_comparison_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, 
             "backend": backend,
             "model": model,
             "examples": len(group),
+            "aggregation": "macro_mean_over_examples; micro_from_pooled_counts_when_available",
         }
-        for field in numeric_fields:
+        for field in mean_fields:
             vals = [float(row[field]) for row in group if isinstance(row.get(field), (int, float))]
             agg[field] = round(mean(vals), 6) if vals else None
+
+        # Explicit aliases make the summary self-describing while keeping the
+        # original keys stable for existing notebooks/app code.
+        agg["precision_macro"] = agg.get("precision")
+        agg["recall_macro"] = agg.get("recall")
+        agg["f1_macro"] = agg.get("f1")
+        agg["coverage_macro"] = agg.get("coverage")
+        agg.update(_micro_scores(group))
+
+        latencies = [float(row["latency_ms"]) for row in group if isinstance(row.get("latency_ms"), (int, float))]
+        costs = [float(row["cost_usd_est"]) for row in group if isinstance(row.get("cost_usd_est"), (int, float))]
+        agg["latency_ms"] = round(mean(latencies), 6) if latencies else None
+        agg["latency_ms_mean_per_example"] = agg["latency_ms"]
+        agg["latency_ms_total"] = round(sum(latencies), 6) if latencies else None
+        agg["cost_usd_est"] = round(mean(costs), 8) if costs else None
+        agg["cost_usd_est_mean_per_example"] = agg["cost_usd_est"]
+        agg["cost_usd_est_total"] = round(sum(costs), 8) if costs else None
         out.append(agg)
     return out
