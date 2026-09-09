@@ -16,7 +16,7 @@ from spatio_textual.evaluation import (
 )
 from spatio_textual.gold import load_gold_jsonl
 from spatio_textual.rules import RuleGazetteerAnnotator, filter_supported_gold_labels
-from spatio_textual.utils import Annotator
+from spatio_textual.utils import Annotator, load_spacy_model
 
 
 def _parse_args() -> argparse.Namespace:
@@ -25,7 +25,11 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("input", type=Path, help="SH2026 reference JSONL")
     p.add_argument("--out-dir", type=Path, default=Path("sh2026_outputs/benchmark"))
-    p.add_argument("--methods", default="rules", help="Comma-separated: rules,spacy")
+    p.add_argument(
+        "--methods",
+        default="rules",
+        help="Comma-separated: rules,spacy,spacy_resources",
+    )
     p.add_argument("--gazetteer", type=Path, default=Path("tutorials/sh2026/data/teaching_gazetteer.csv"))
     p.add_argument("--spacy-model", default="en_core_web_sm")
     p.add_argument(
@@ -120,11 +124,24 @@ def run_rules(record: dict[str, Any], gazetteer: Path) -> dict[str, Any]:
     )
 
 
-def build_spacy_runner(model_name: str):
+def build_spacy_runner(model_name: str) -> Annotator:
     nlp = _strict_spacy_model(model_name)
-    # Important experimental control: do not add project EntityRuler resources to
-    # the contextual-only condition.
+    # Important experimental control: no project EntityRuler in this condition.
     return Annotator(nlp=nlp, model_name=model_name, link_places=False)
+
+
+def build_spacy_resources_runner(model_name: str) -> Annotator:
+    # First fail loudly if the requested statistical model is unavailable. Only
+    # then use the package loader to add the pre-existing project EntityRuler.
+    # This prevents the tutorial loader's blank-model fallback from contaminating
+    # a formal benchmark while keeping the production resource-loading path exact.
+    _strict_spacy_model(model_name)
+    nlp = load_spacy_model(model_name, add_entity_ruler=True)
+    return Annotator(
+        nlp=nlp,
+        model_name=f"{model_name}+project_resources",
+        link_places=False,
+    )
 
 
 def run_spacy(record: dict[str, Any], annotator: Annotator, model_name: str) -> dict[str, Any]:
@@ -148,6 +165,30 @@ def run_spacy(record: dict[str, Any], annotator: Annotator, model_name: str) -> 
     )
 
 
+def run_spacy_resources(record: dict[str, Any], annotator: Annotator, model_name: str) -> dict[str, Any]:
+    result = annotator.annotate(record["text"], include_entities=True, include_verbs=False, include_events=False)
+    predicted = harmonize_ner_entities(result.get("entities", []))
+    reference = reference_spans_for_ner(record, include_geonouns=True, include_temporal=False)
+    reach = supported_reference_fraction(record, {"TOPONYM", "GEONOUN"})
+    return span_comparison_row(
+        example_id=record["example_id"],
+        method="contextual_ner_plus_resources",
+        backend="spacy+entity_ruler",
+        model=f"{model_name}+project_resources",
+        predicted=predicted,
+        reference=reference,
+        task="toponym_geonoun_recognition",
+        match="exact",
+        supported_reference_total=reach["ontology_supported"],
+        reference_total=reach["reference_total"],
+        telemetry=result.get("telemetry", []),
+        notes=(
+            "Hybrid condition: the same contextual spaCy model plus the project resource lists frozen before holdout inspection. "
+            "Accuracy covers TOPONYM+GEONOUN; broader ontology coverage remains separate."
+        ),
+    )
+
+
 def main() -> None:
     args = _parse_args()
     records = load_gold_jsonl(args.input)
@@ -161,17 +202,26 @@ def main() -> None:
         )
 
     methods = {item.strip().lower() for item in args.methods.split(",") if item.strip()}
-    unknown = methods - {"rules", "spacy"}
+    allowed = {"rules", "spacy", "spacy_resources"}
+    unknown = methods - allowed
     if unknown:
         raise SystemExit(f"Unsupported methods: {sorted(unknown)}")
 
     spacy_runner = build_spacy_runner(args.spacy_model) if "spacy" in methods else None
+    spacy_resources_runner = (
+        build_spacy_resources_runner(args.spacy_model)
+        if "spacy_resources" in methods
+        else None
+    )
+
     rows: list[dict[str, Any]] = []
     for record in records:
         if "rules" in methods:
             rows.append(run_rules(record, args.gazetteer))
         if spacy_runner is not None:
             rows.append(run_spacy(record, spacy_runner, args.spacy_model))
+        if spacy_resources_runner is not None:
+            rows.append(run_spacy_resources(record, spacy_resources_runner, args.spacy_model))
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     per_example_jsonl = args.out_dir / "comparison_rows.jsonl"
