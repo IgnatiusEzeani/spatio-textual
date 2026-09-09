@@ -32,6 +32,15 @@ from .journeys import (
     normalise_model_journey,
     validate_runtime_journey,
 )
+from .journey_evaluation import (
+    JOURNEY_VALUE_FIELDS,
+    candidate_journey_match,
+    evaluate_journeys,
+    evidence_iou,
+    match_journeys,
+    normalize_journey_value,
+    score_matched_journey_fields,
+)
 from .review import HUMAN_STATUSES, REVIEW_REASONS, apply_human_review, human_correction_burden
 from .viz import journeys_to_geojson
 from .provenance import build_run_manifest, redact_secret_like_keys, sha256_text
@@ -54,6 +63,8 @@ __all__ = [
     "reference_spatial_reach", "supported_reference_fraction",
     "JOURNEY_FIELDS", "JourneyExtractor", "build_journey_prompt", "normalise_model_journey",
     "validate_runtime_journey", "journey_field_status_counts",
+    "JOURNEY_VALUE_FIELDS", "normalize_journey_value", "evidence_iou", "candidate_journey_match",
+    "match_journeys", "score_matched_journey_fields", "evaluate_journeys",
     "HUMAN_STATUSES", "REVIEW_REASONS", "apply_human_review", "human_correction_burden",
     "journeys_to_geojson",
     "build_run_manifest", "redact_secret_like_keys", "sha256_text",
