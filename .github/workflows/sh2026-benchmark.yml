@@ -1,0 +1,68 @@
+name: SH2026 benchmark smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "benchmarks/sh2026/**"
+      - "scripts/run_sh2026_benchmark.py"
+      - "spatio_textual/**"
+      - "tutorials/sh2026/data/teaching_gazetteer.csv"
+      - ".github/workflows/sh2026-benchmark.yml"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lightweight benchmark environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-lite.txt
+
+      - name: Generate and verify frozen holdout
+        run: |
+          python benchmarks/sh2026/build_holdout_v1.py
+          cd benchmarks/sh2026
+          sha256sum -c holdout_v1.sha256
+
+      - name: Validate reference annotations
+        run: |
+          python - <<'PY'
+          from spatio_textual.gold import load_gold_jsonl, assert_valid_gold
+          path = "benchmarks/sh2026/holdout_v1.jsonl"
+          records = load_gold_jsonl(path)
+          assert len(records) == 30
+          assert_valid_gold(records)
+          print(f"Validated {len(records)} frozen reference records")
+          PY
+
+      - name: Run rules and contextual spaCy benchmark
+        run: |
+          python scripts/run_sh2026_benchmark.py \
+            benchmarks/sh2026/holdout_v1.jsonl \
+            --methods rules,spacy \
+            --spacy-model en_core_web_sm \
+            --benchmark-mode \
+            --frozen-at-commit "$GITHUB_SHA" \
+            --expected-sha256 be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b \
+            --out-dir sh2026_outputs/benchmark_v1
+
+      - name: Print benchmark summary
+        run: cat sh2026_outputs/benchmark_v1/comparison_summary.json
+
+      - name: Upload benchmark audit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sh2026-benchmark-v1-${{ github.run_id }}
+          path: |
+            sh2026_outputs/benchmark_v1/
+            benchmarks/sh2026/holdout_v1.jsonl
+            benchmarks/sh2026/holdout_v1.sha256
+          if-no-files-found: error
+          retention-days: 30
