@@ -4,8 +4,11 @@
     "title": "Lake District travel writing: Penrith to Pooley Bridge",
     "genre": "historical travel writing",
     "text": "From Penrith two roads lead to Pooley Bridge, about six miles distant, which spans the Eamont just at its issue from Ulleswater.",
-    "source_note": "Short nineteenth-century Lake District travel-writing example used in the Spatial Narratives project teaching materials. Verify the exact CLDW source/edition citation before final public release.",
-    "distribution_status": "public_domain_example_pending_exact_citation",
+    "source_note": "Verified in the Corpus of Lake District Writing, corpus ID 1857_b: Anon.-Nelson (pub.), The English Lakes (London: Thomas Nelson & Sons, 1859), p. 4 of the source transcription. CLDW file LD80_transcribed/Anon1857_b.xml; metadata row 66. Preserve the source spelling 'Ulleswater'.",
+    "source_citation": "Anon.-Nelson (pub.). The English Lakes. London: Thomas Nelson & Sons, 1859, p. 4. Corpus of Lake District Writing, ID 1857_b.",
+    "source_repository_path": "UCREL/LakeDistrictCorpus/LD80_transcribed/Anon1857_b.xml",
+    "source_repository_commit": "9042811cf590f694f9b635c4bc656ed4f81ca422",
+    "distribution_status": "public_domain_source_verified",
     "teaching_targets": ["toponyms", "geo-nouns", "distance", "spatial relation"]
   },
   {
