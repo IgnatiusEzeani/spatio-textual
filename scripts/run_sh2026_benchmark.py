@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -30,15 +31,45 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--benchmark-mode",
         action="store_true",
-        help="Refuse provisional/development records and require --frozen-at-commit.",
+        help="Refuse provisional/development records and require freeze metadata/checksum.",
     )
     p.add_argument("--frozen-at-commit", default=None)
+    p.add_argument(
+        "--expected-sha256",
+        default=None,
+        help="Expected SHA-256 of the exact benchmark JSONL. Required in --benchmark-mode.",
+    )
     return p.parse_args()
 
 
-def _assert_benchmark_ready(records: list[dict[str, Any]], frozen_at_commit: str | None) -> None:
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _assert_benchmark_ready(
+    records: list[dict[str, Any]],
+    *,
+    input_path: Path,
+    frozen_at_commit: str | None,
+    expected_sha256: str | None,
+) -> str:
     if not frozen_at_commit:
         raise SystemExit("--benchmark-mode requires --frozen-at-commit so results remain tied to a frozen data revision.")
+    if not expected_sha256:
+        raise SystemExit("--benchmark-mode requires --expected-sha256 so the exact benchmark bytes are verified.")
+
+    actual_sha256 = _sha256(input_path)
+    if actual_sha256.lower() != expected_sha256.strip().lower():
+        raise SystemExit(
+            "Benchmark checksum mismatch: "
+            f"expected {expected_sha256.strip().lower()}, got {actual_sha256.lower()}. "
+            "Refusing to label this run as an SH2026 benchmark."
+        )
+
     bad = []
     for rec in records:
         status = str(rec.get("reference_status") or "").lower()
@@ -49,6 +80,7 @@ def _assert_benchmark_ready(records: list[dict[str, Any]], frozen_at_commit: str
         raise SystemExit(
             "Benchmark mode refused provisional/pending records: " + ", ".join(str(x) for x in bad)
         )
+    return actual_sha256
 
 
 def _strict_spacy_model(model_name: str):
@@ -80,7 +112,11 @@ def run_rules(record: dict[str, Any], gazetteer: Path) -> dict[str, Any]:
         supported_reference_total=reach["ontology_supported"],
         reference_total=reach["reference_total"],
         telemetry=result.get("telemetry", []),
-        notes="Accuracy denominator contains only labels the deterministic baseline is designed to predict; coverage reports its broader ontology ceiling.",
+        notes=(
+            "Accuracy denominator contains only labels the deterministic baseline is designed to predict; "
+            "coverage reports its broader ontology ceiling. The gazetteer is the pre-holdout teaching/development "
+            "gazetteer and is not expanded using holdout errors."
+        ),
     )
 
 
@@ -115,8 +151,14 @@ def run_spacy(record: dict[str, Any], annotator: Annotator, model_name: str) -> 
 def main() -> None:
     args = _parse_args()
     records = load_gold_jsonl(args.input)
+    input_sha256 = _sha256(args.input)
     if args.benchmark_mode:
-        _assert_benchmark_ready(records, args.frozen_at_commit)
+        input_sha256 = _assert_benchmark_ready(
+            records,
+            input_path=args.input,
+            frozen_at_commit=args.frozen_at_commit,
+            expected_sha256=args.expected_sha256,
+        )
 
     methods = {item.strip().lower() for item in args.methods.split(",") if item.strip()}
     unknown = methods - {"rules", "spacy"}
@@ -137,8 +179,6 @@ def main() -> None:
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # Tidy CSV intentionally drops nested telemetry_summary; the JSONL remains the
-    # richer audit object.
     core_columns = [
         "example_id", "method", "backend", "model", "task", "precision", "recall", "f1",
         "coverage", "unsupported_rate", "ambiguous_rate", "human_edits_required", "latency_ms",
@@ -153,6 +193,7 @@ def main() -> None:
                 "run_mode": "benchmark" if args.benchmark_mode else "development",
                 "frozen_at_commit": args.frozen_at_commit,
                 "input": str(args.input),
+                "input_sha256": input_sha256,
                 "methods": sorted(methods),
                 "summary": summary,
             },
@@ -164,6 +205,7 @@ def main() -> None:
     pd.DataFrame(summary).to_csv(args.out_dir / "comparison_summary.csv", index=False)
 
     print(f"Wrote {len(rows)} comparison rows to {args.out_dir}")
+    print(f"Input SHA-256: {input_sha256}")
     if not args.benchmark_mode:
         print("DEVELOPMENT MODE: outputs are diagnostic and must not be reported as final SH2026 benchmark results.")
 
