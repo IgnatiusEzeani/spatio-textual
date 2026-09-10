@@ -1,7 +1,14 @@
 {
   "schema_version": "sh2026-cldw-external-manifest-v1",
   "purpose": "Independent historical-language validation of named-place recognition after the synthetic SH2026 benchmark was frozen.",
-  "status": "source_selection_frozen_before_model_execution",
+  "status": "source_selection_and_derived_dataset_frozen",
+  "derived_dataset": {
+    "sha256": "257a463e8dd5b154edb7951c8b8bb6d05f609043db17adaa2324d7290b06836c",
+    "n_passages": 10,
+    "n_gold_toponym_mentions": 43,
+    "extraction_rule_version": "sh2026-cldw-paragraph-v1",
+    "freeze_note": "The source list and deterministic passage-selection rule were fixed before model execution. This checksum was recorded after the first successful deterministic construction and is now a release invariant; model errors did not alter the selected files or passages."
+  },
   "upstream": {
     "repository": "UCREL/LakeDistrictCorpus",
     "commit": "9042811cf590f694f9b635c4bc656ed4f81ca422",
