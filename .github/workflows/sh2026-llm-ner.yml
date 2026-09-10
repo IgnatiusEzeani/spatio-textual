@@ -1,0 +1,147 @@
+name: SH2026 LLM NER formal
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Formal LLM NER condition to run"
+        required: true
+        default: "synthetic_toponym"
+        type: choice
+        options:
+          - synthetic_toponym
+          - synthetic_full_spatial
+          - cldw_toponym
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  llm-ner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SH2026_HEAD_SHA: ${{ github.sha }}
+      SH2026_MODEL: gpt-5.6-sol
+      SH2026_REASONING_EFFORT: none
+      HOLDOUT_SHA256: be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b
+      CLDW_COMMIT: 9042811cf590f694f9b635c4bc656ed4f81ca422
+      CLDW_SHA256: 257a463e8dd5b154edb7951c8b8bb6d05f609043db17adaa2324d7290b06836c
+    steps:
+      - name: Check out SH2026 branch
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install formal LLM environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-lite.txt
+          python -m pip install -e '.[llm]'
+          mkdir -p sh2026_outputs/llm_ner_formal
+          python -m pip freeze > sh2026_outputs/llm_ner_formal/python_environment.txt
+          python --version > sh2026_outputs/llm_ner_formal/python_version.txt
+
+      - name: Require OpenAI repository secret
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY repository secret is not configured; refusing paid formal inference." >&2
+            exit 1
+          fi
+
+      - name: Build frozen synthetic holdout
+        if: ${{ inputs.scope == 'synthetic_toponym' || inputs.scope == 'synthetic_full_spatial' || inputs.scope == 'all' }}
+        run: |
+          python benchmarks/sh2026/build_holdout_v1.py
+          ACTUAL=$(sha256sum benchmarks/sh2026/holdout_v1.jsonl | cut -d' ' -f1)
+          test "$ACTUAL" = "$HOLDOUT_SHA256"
+
+      - name: Run formal synthetic TOPONYM LLM condition
+        if: ${{ inputs.scope == 'synthetic_toponym' || inputs.scope == 'all' }}
+        run: |
+          python scripts/run_sh2026_llm_ner.py benchmarks/sh2026/holdout_v1.jsonl \
+            --condition toponym \
+            --provider openai \
+            --model "$SH2026_MODEL" \
+            --reasoning-effort "$SH2026_REASONING_EFFORT" \
+            --benchmark-mode \
+            --frozen-at-commit "$SH2026_HEAD_SHA" \
+            --expected-sha256 "$HOLDOUT_SHA256" \
+            --out-dir sh2026_outputs/llm_ner_formal/synthetic_toponym
+
+      - name: Run formal synthetic full-spatial LLM condition
+        if: ${{ inputs.scope == 'synthetic_full_spatial' || inputs.scope == 'all' }}
+        run: |
+          python scripts/run_sh2026_llm_ner.py benchmarks/sh2026/holdout_v1.jsonl \
+            --condition full_spatial \
+            --provider openai \
+            --model "$SH2026_MODEL" \
+            --reasoning-effort "$SH2026_REASONING_EFFORT" \
+            --benchmark-mode \
+            --frozen-at-commit "$SH2026_HEAD_SHA" \
+            --expected-sha256 "$HOLDOUT_SHA256" \
+            --out-dir sh2026_outputs/llm_ner_formal/synthetic_full_spatial
+
+      - name: Check out pinned CLDW corpus
+        if: ${{ inputs.scope == 'cldw_toponym' || inputs.scope == 'all' }}
+        uses: actions/checkout@v4
+        with:
+          repository: UCREL/LakeDistrictCorpus
+          ref: ${{ env.CLDW_COMMIT }}
+          path: cldw_upstream
+          fetch-depth: 1
+
+      - name: Build and verify frozen CLDW external validation
+        if: ${{ inputs.scope == 'cldw_toponym' || inputs.scope == 'all' }}
+        run: |
+          mkdir -p sh2026_outputs/llm_ner_formal/cldw
+          python benchmarks/sh2026/build_cldw_external_v1.py \
+            --upstream-root cldw_upstream \
+            --output sh2026_outputs/llm_ner_formal/cldw/cldw_external_v1.jsonl
+          ACTUAL=$(sha256sum sh2026_outputs/llm_ner_formal/cldw/cldw_external_v1.jsonl | cut -d' ' -f1)
+          test "$ACTUAL" = "$CLDW_SHA256"
+
+      - name: Run formal CLDW TOPONYM LLM condition
+        if: ${{ inputs.scope == 'cldw_toponym' || inputs.scope == 'all' }}
+        run: |
+          python scripts/run_sh2026_llm_ner.py sh2026_outputs/llm_ner_formal/cldw/cldw_external_v1.jsonl \
+            --condition toponym \
+            --provider openai \
+            --model "$SH2026_MODEL" \
+            --reasoning-effort "$SH2026_REASONING_EFFORT" \
+            --benchmark-mode \
+            --frozen-at-commit "$SH2026_HEAD_SHA" \
+            --expected-sha256 "$CLDW_SHA256" \
+            --out-dir sh2026_outputs/llm_ner_formal/cldw_toponym
+
+      - name: Record formal-condition metadata
+        run: |
+          cat > sh2026_outputs/llm_ner_formal/formal_condition.json <<EOF
+          {
+            "scope": "${{ inputs.scope }}",
+            "provider": "openai",
+            "model": "$SH2026_MODEL",
+            "api": "responses",
+            "structured_output": "strict_json_schema",
+            "reasoning_effort": "$SH2026_REASONING_EFFORT",
+            "temperature": "not_set_api_default",
+            "sh2026_commit": "$SH2026_HEAD_SHA",
+            "holdout_sha256": "$HOLDOUT_SHA256",
+            "cldw_commit": "$CLDW_COMMIT",
+            "cldw_sha256": "$CLDW_SHA256"
+          }
+          EOF
+
+      - name: Upload formal LLM NER audit artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sh2026-llm-ner-${{ inputs.scope }}-${{ github.run_id }}
+          path: |
+            sh2026_outputs/llm_ner_formal/
+            docs/sh2026/LLM_NER_EXPERIMENT.md
+          if-no-files-found: error
+          retention-days: 30
