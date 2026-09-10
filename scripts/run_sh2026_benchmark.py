@@ -19,6 +19,11 @@ from spatio_textual.rules import RuleGazetteerAnnotator, filter_supported_gold_l
 from spatio_textual.transformer_ner import HFNERAnnotator
 from spatio_textual.utils import Annotator, load_spacy_model
 
+DEFAULT_HF_MODEL = "dslim/bert-base-NER"
+# Pinned after the safetensors model was present; later upstream changes are
+# mainly model-card edits. Formal SH2026 runs should record this exact revision.
+DEFAULT_HF_REVISION = "0b95561fd0c304538b5eb8a0ee532ca24dd009b9"
+
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -35,8 +40,13 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--spacy-model", default="en_core_web_sm")
     p.add_argument(
         "--hf-model",
-        default="dslim/bert-base-NER",
-        help="Frozen Hugging Face token-classification model used by the hf condition.",
+        default=DEFAULT_HF_MODEL,
+        help="Hugging Face token-classification model used by the hf condition.",
+    )
+    p.add_argument(
+        "--hf-revision",
+        default=DEFAULT_HF_REVISION,
+        help="Pinned Hugging Face model revision. Set explicitly for formal comparisons.",
     )
     p.add_argument(
         "--benchmark-mode",
@@ -132,15 +142,10 @@ def run_rules(record: dict[str, Any], gazetteer: Path) -> dict[str, Any]:
 
 def build_spacy_runner(model_name: str) -> Annotator:
     nlp = _strict_spacy_model(model_name)
-    # Important experimental control: no project EntityRuler in this condition.
     return Annotator(nlp=nlp, model_name=model_name, link_places=False)
 
 
 def build_spacy_resources_runner(model_name: str) -> Annotator:
-    # First fail loudly if the requested statistical model is unavailable. Only
-    # then use the package loader to add the pre-existing project EntityRuler.
-    # This prevents the tutorial loader's blank-model fallback from contaminating
-    # a formal benchmark while keeping the production resource-loading path exact.
     _strict_spacy_model(model_name)
     nlp = load_spacy_model(model_name, add_entity_ruler=True)
     return Annotator(
@@ -150,17 +155,13 @@ def build_spacy_resources_runner(model_name: str) -> Annotator:
     )
 
 
-def build_hf_runner(model_name: str) -> HFNERAnnotator:
-    """Instantiate the frozen HF token-classification condition.
-
-    The benchmark deliberately disables place linking so recognition accuracy is
-    not confounded with gazetteer resolution. Model download or import failures
-    are fatal in the formal workflow rather than silently replaced by a fallback.
-    """
+def build_hf_runner(model_name: str, revision: str | None) -> HFNERAnnotator:
+    """Instantiate a revision-pinned HF token-classification condition."""
     try:
-        return HFNERAnnotator(model_name=model_name, link_places=False)
+        return HFNERAnnotator(model_name=model_name, revision=revision, link_places=False)
     except Exception as exc:
-        raise SystemExit(f"Could not initialise Hugging Face model {model_name!r}: {exc}") from exc
+        identifier = f"{model_name}@{revision}" if revision else model_name
+        raise SystemExit(f"Could not initialise Hugging Face model {identifier!r}: {exc}") from exc
 
 
 def run_spacy(record: dict[str, Any], annotator: Annotator, model_name: str) -> dict[str, Any]:
@@ -208,7 +209,7 @@ def run_spacy_resources(record: dict[str, Any], annotator: Annotator, model_name
     )
 
 
-def run_hf(record: dict[str, Any], annotator: HFNERAnnotator, model_name: str) -> dict[str, Any]:
+def run_hf(record: dict[str, Any], annotator: HFNERAnnotator) -> dict[str, Any]:
     result = annotator.annotate(record["text"])
     if result.get("error"):
         raise SystemExit(
@@ -221,7 +222,7 @@ def run_hf(record: dict[str, Any], annotator: HFNERAnnotator, model_name: str) -
         example_id=record["example_id"],
         method="hf_transformer_ner",
         backend="huggingface_transformers",
-        model=model_name,
+        model=annotator.model_identifier,
         predicted=predicted,
         reference=reference,
         task="toponym_recognition",
@@ -230,7 +231,7 @@ def run_hf(record: dict[str, Any], annotator: HFNERAnnotator, model_name: str) -
         reference_total=reach["reference_total"],
         telemetry=result.get("telemetry", []),
         notes=(
-            "Frozen off-the-shelf Hugging Face token-classification condition. Accuracy is TOPONYM-only, "
+            "Revision-pinned off-the-shelf Hugging Face token-classification condition. Accuracy is TOPONYM-only, "
             "matching the contextual spaCy recognition denominator; place linking is disabled and representational "
             "reach is reported separately from within-task accuracy."
         ),
@@ -261,7 +262,7 @@ def main() -> None:
         if "spacy_resources" in methods
         else None
     )
-    hf_runner = build_hf_runner(args.hf_model) if "hf" in methods else None
+    hf_runner = build_hf_runner(args.hf_model, args.hf_revision) if "hf" in methods else None
 
     rows: list[dict[str, Any]] = []
     for record in records:
@@ -272,7 +273,7 @@ def main() -> None:
         if spacy_resources_runner is not None:
             rows.append(run_spacy_resources(record, spacy_resources_runner, args.spacy_model))
         if hf_runner is not None:
-            rows.append(run_hf(record, hf_runner, args.hf_model))
+            rows.append(run_hf(record, hf_runner))
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     per_example_jsonl = args.out_dir / "comparison_rows.jsonl"
@@ -288,6 +289,9 @@ def main() -> None:
     pd.DataFrame(rows).reindex(columns=core_columns).to_csv(args.out_dir / "comparison_rows.csv", index=False)
 
     summary = aggregate_comparison_rows(rows)
+    hf_identifier = None
+    if "hf" in methods:
+        hf_identifier = f"{args.hf_model}@{args.hf_revision}" if args.hf_revision else args.hf_model
     (args.out_dir / "comparison_summary.json").write_text(
         json.dumps(
             {
@@ -298,7 +302,8 @@ def main() -> None:
                 "methods": sorted(methods),
                 "models": {
                     "spacy": args.spacy_model if {"spacy", "spacy_resources"} & methods else None,
-                    "hf": args.hf_model if "hf" in methods else None,
+                    "hf": hf_identifier,
+                    "hf_revision": args.hf_revision if "hf" in methods else None,
                 },
                 "summary": summary,
             },
