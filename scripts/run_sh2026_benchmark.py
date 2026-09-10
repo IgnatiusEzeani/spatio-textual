@@ -16,6 +16,7 @@ from spatio_textual.evaluation import (
 )
 from spatio_textual.gold import load_gold_jsonl
 from spatio_textual.rules import RuleGazetteerAnnotator, filter_supported_gold_labels
+from spatio_textual.transformer_ner import HFNERAnnotator
 from spatio_textual.utils import Annotator, load_spacy_model
 
 
@@ -28,10 +29,15 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--methods",
         default="rules",
-        help="Comma-separated: rules,spacy,spacy_resources",
+        help="Comma-separated: rules,spacy,spacy_resources,hf",
     )
     p.add_argument("--gazetteer", type=Path, default=Path("tutorials/sh2026/data/teaching_gazetteer.csv"))
     p.add_argument("--spacy-model", default="en_core_web_sm")
+    p.add_argument(
+        "--hf-model",
+        default="dslim/bert-base-NER",
+        help="Frozen Hugging Face token-classification model used by the hf condition.",
+    )
     p.add_argument(
         "--benchmark-mode",
         action="store_true",
@@ -144,6 +150,19 @@ def build_spacy_resources_runner(model_name: str) -> Annotator:
     )
 
 
+def build_hf_runner(model_name: str) -> HFNERAnnotator:
+    """Instantiate the frozen HF token-classification condition.
+
+    The benchmark deliberately disables place linking so recognition accuracy is
+    not confounded with gazetteer resolution. Model download or import failures
+    are fatal in the formal workflow rather than silently replaced by a fallback.
+    """
+    try:
+        return HFNERAnnotator(model_name=model_name, link_places=False)
+    except Exception as exc:
+        raise SystemExit(f"Could not initialise Hugging Face model {model_name!r}: {exc}") from exc
+
+
 def run_spacy(record: dict[str, Any], annotator: Annotator, model_name: str) -> dict[str, Any]:
     result = annotator.annotate(record["text"], include_entities=True, include_verbs=False, include_events=False)
     predicted = harmonize_ner_entities(result.get("entities", []))
@@ -189,6 +208,35 @@ def run_spacy_resources(record: dict[str, Any], annotator: Annotator, model_name
     )
 
 
+def run_hf(record: dict[str, Any], annotator: HFNERAnnotator, model_name: str) -> dict[str, Any]:
+    result = annotator.annotate(record["text"])
+    if result.get("error"):
+        raise SystemExit(
+            f"Hugging Face benchmark inference failed for {record['example_id']}: {result['error']}"
+        )
+    predicted = harmonize_ner_entities(result.get("entities", []))
+    reference = reference_spans_for_ner(record, include_geonouns=False, include_temporal=False)
+    reach = supported_reference_fraction(record, {"TOPONYM"})
+    return span_comparison_row(
+        example_id=record["example_id"],
+        method="hf_transformer_ner",
+        backend="huggingface_transformers",
+        model=model_name,
+        predicted=predicted,
+        reference=reference,
+        task="toponym_recognition",
+        match="exact",
+        supported_reference_total=reach["ontology_supported"],
+        reference_total=reach["reference_total"],
+        telemetry=result.get("telemetry", []),
+        notes=(
+            "Frozen off-the-shelf Hugging Face token-classification condition. Accuracy is TOPONYM-only, "
+            "matching the contextual spaCy recognition denominator; place linking is disabled and representational "
+            "reach is reported separately from within-task accuracy."
+        ),
+    )
+
+
 def main() -> None:
     args = _parse_args()
     records = load_gold_jsonl(args.input)
@@ -202,7 +250,7 @@ def main() -> None:
         )
 
     methods = {item.strip().lower() for item in args.methods.split(",") if item.strip()}
-    allowed = {"rules", "spacy", "spacy_resources"}
+    allowed = {"rules", "spacy", "spacy_resources", "hf"}
     unknown = methods - allowed
     if unknown:
         raise SystemExit(f"Unsupported methods: {sorted(unknown)}")
@@ -213,6 +261,7 @@ def main() -> None:
         if "spacy_resources" in methods
         else None
     )
+    hf_runner = build_hf_runner(args.hf_model) if "hf" in methods else None
 
     rows: list[dict[str, Any]] = []
     for record in records:
@@ -222,6 +271,8 @@ def main() -> None:
             rows.append(run_spacy(record, spacy_runner, args.spacy_model))
         if spacy_resources_runner is not None:
             rows.append(run_spacy_resources(record, spacy_resources_runner, args.spacy_model))
+        if hf_runner is not None:
+            rows.append(run_hf(record, hf_runner, args.hf_model))
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     per_example_jsonl = args.out_dir / "comparison_rows.jsonl"
@@ -245,6 +296,10 @@ def main() -> None:
                 "input": str(args.input),
                 "input_sha256": input_sha256,
                 "methods": sorted(methods),
+                "models": {
+                    "spacy": args.spacy_model if {"spacy", "spacy_resources"} & methods else None,
+                    "hf": args.hf_model if "hf" in methods else None,
+                },
                 "summary": summary,
             },
             ensure_ascii=False,
