@@ -21,9 +21,10 @@ from spatio_textual.llm_spans import (
     FULL_SPATIAL_LABELS,
     LLMSpanExtractor,
     TOPONYM_LABELS,
-    build_span_prompt,
     span_audit_metrics,
+    span_response_schema,
 )
+from spatio_textual.openai_responses import OpenAIResponsesJSONClient
 
 REMOTE_PROVIDER_KEYS = {
     "openai": "OPENAI_API_KEY",
@@ -47,6 +48,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--provider", default="openai")
     p.add_argument("--model", default=None)
     p.add_argument("--base-url", default=None)
+    p.add_argument(
+        "--reasoning-effort",
+        choices=["none", "low", "medium", "high", "xhigh", "max"],
+        default="none",
+        help="OpenAI Responses reasoning effort. TOPONYM-only formal runs use none unless protocol version changes.",
+    )
     p.add_argument("--benchmark-mode", action="store_true")
     p.add_argument("--frozen-at-commit", default=None)
     p.add_argument("--expected-sha256", default=None)
@@ -73,6 +80,13 @@ def assert_benchmark_ready(args: argparse.Namespace, records: list[dict[str, Any
         raise SystemExit("--benchmark-mode requires --expected-sha256")
     if args.max_examples is not None:
         raise SystemExit("--max-examples cannot be used in --benchmark-mode")
+    if args.predictions is None and args.provider == "openai" and args.reasoning_effort != "none":
+        raise SystemExit("SH2026 TOPONYM/full-spatial v1 formal OpenAI runs require --reasoning-effort none")
+    if args.predictions is None and args.provider != "openai":
+        raise SystemExit(
+            "SH2026 LLM NER v1 formal live runs currently require provider=openai so strict Responses JSON Schema is enforced. "
+            "Other providers may be evaluated later from separately frozen cached predictions."
+        )
     actual = sha256_path(args.input)
     if actual.lower() != args.expected_sha256.strip().lower():
         raise SystemExit(f"Benchmark checksum mismatch: expected {args.expected_sha256}, got {actual}")
@@ -193,7 +207,7 @@ def evaluate(record: dict[str, Any], prediction: dict[str, Any], condition: str)
     exact = span_comparison_row(
         example_id=str(record["example_id"]),
         method="llm_toponym" if condition == "toponym" else "llm_full_spatial",
-        backend="llm",
+        backend="openai_responses" if prediction.get("provider") == "openai" else "llm",
         model=prediction.get("model"),
         predicted=predicted,
         reference=reference,
@@ -223,6 +237,24 @@ def evaluate(record: dict[str, Any], prediction: dict[str, Any], condition: str)
     return exact
 
 
+def build_live_extractor(args: argparse.Namespace) -> LLMSpanExtractor:
+    labels = allowed_labels(args.condition)
+    if args.provider == "openai":
+        if not args.model:
+            raise SystemExit("OpenAI live LLM NER requires an explicit --model identifier")
+        schema_name = f"sh2026_{args.condition}_v1"
+        client = OpenAIResponsesJSONClient(
+            model=args.model,
+            response_schema=span_response_schema(labels),
+            schema_name=schema_name,
+            reasoning_effort=args.reasoning_effort,
+            base_url=args.base_url,
+        )
+    else:
+        client = LLMClient(provider=args.provider, model=args.model, base_url=args.base_url)
+    return LLMSpanExtractor(client, allowed_labels=labels)
+
+
 def main() -> None:
     args = parse_args()
     records = load_gold_jsonl(args.input)
@@ -245,11 +277,8 @@ def main() -> None:
             formal=args.benchmark_mode,
         )
     else:
-        if args.benchmark_mode and not args.model:
-            raise SystemExit("Formal live LLM NER benchmark requires an explicit --model identifier")
         require_live_provider(args.provider, args.base_url)
-        client = LLMClient(provider=args.provider, model=args.model, base_url=args.base_url)
-        extractor = LLMSpanExtractor(client, allowed_labels=allowed_labels(args.condition))
+        extractor = build_live_extractor(args)
 
     predictions: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
@@ -290,6 +319,9 @@ def main() -> None:
     pd.DataFrame(rows).to_csv(args.out_dir / "llm_ner_evaluation_rows.csv", index=False)
 
     summary = aggregate_comparison_rows(rows)
+    live_api = "openai_responses_json_schema" if cached is None and args.provider == "openai" else (
+        "provider_specific_generic_json" if cached is None else "not_applicable_cached_predictions"
+    )
     manifest = {
         "schema_version": "sh2026-llm-ner-run-v1",
         "run_mode": "benchmark" if args.benchmark_mode else "development",
@@ -301,11 +333,19 @@ def main() -> None:
         "examples": len(records),
         "provider": "cached" if cached is not None else args.provider,
         "model": "cached" if cached is not None else args.model,
+        "api_mode": live_api,
+        "reasoning_effort": None if cached is not None else args.reasoning_effort,
         "prompt_policy": "spatio_textual.llm_spans.build_span_prompt",
+        "response_schema_sha256": sha256_text(json.dumps(span_response_schema(allowed_labels(args.condition)), sort_keys=True)),
         "offset_policy": "model_returns_verbatim_text_and_evidence; software_computes_offsets",
         "primary_match": "exact_character_span_and_label",
         "secondary_match": "overlap_character_span_and_label",
-        "decoding_configuration": "provider_default_in_current_LLMClient; freeze before keynote-grade live run",
+        "repetitions": 1,
+        "temperature": "not_set; API/model default",
+        "note": (
+            "Formal SH2026 LLM NER v1 uses strict OpenAI Responses JSON Schema and reasoning_effort=none. "
+            "One observed run does not support claims about stochastic stability; preserve predictions for exact re-scoring."
+        ),
     }
     (args.out_dir / "llm_ner_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (args.out_dir / "run_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
