@@ -72,6 +72,7 @@ def _row(
         "backend": backend,
         "model": model,
         "task": "cldw_toponym_recognition_external_validation",
+        "match_policy": "exact_character_span_and_harmonized_TOPONYM_label",
         "reference_count": len(reference),
         "prediction_count": len(predicted),
         "tp": score["tp"],
@@ -84,6 +85,10 @@ def _row(
         "cost_usd_est": tel.get("cost_usd_est_total"),
         "source_path": (record.get("source") or {}).get("path"),
         "paragraph_ordinal": (record.get("source") or {}).get("paragraph_ordinal"),
+        # Keep the evidence needed to audit boundary and ontology disagreements.
+        # These are intentionally present in JSONL but omitted from the flat CSV.
+        "reference_spans": reference,
+        "predicted_spans": predicted,
     }
 
 
@@ -107,6 +112,7 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "backend": backend,
             "model": model,
             "task": "cldw_toponym_recognition_external_validation",
+            "match_policy": "exact_character_span_and_harmonized_TOPONYM_label",
             "examples": len(items),
             "reference_mentions": sum(int(x["reference_count"]) for x in items),
             "prediction_mentions": sum(int(x["prediction_count"]) for x in items),
@@ -208,12 +214,19 @@ def main() -> None:
     with (args.out_dir / "comparison_rows.jsonl").open("w", encoding="utf-8") as fh:
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-    pd.DataFrame(rows).to_csv(args.out_dir / "comparison_rows.csv", index=False)
+
+    # Keep CSV compact and tabular; full auditable spans remain in JSONL.
+    csv_rows = [
+        {k: v for k, v in row.items() if k not in {"reference_spans", "predicted_spans"}}
+        for row in rows
+    ]
+    pd.DataFrame(csv_rows).to_csv(args.out_dir / "comparison_rows.csv", index=False)
     pd.DataFrame(summary).to_csv(args.out_dir / "comparison_summary.csv", index=False)
     (args.out_dir / "comparison_summary.json").write_text(
         json.dumps({
             "evaluation": "source-derived CLDW external validation",
             "scope": "TOPONYM recognition only",
+            "match_policy": "exact_character_span_and_harmonized_TOPONYM_label",
             "input": str(args.input),
             "input_sha256": dataset_sha,
             "frozen_at_commit": args.frozen_at_commit,
@@ -225,7 +238,8 @@ def main() -> None:
             "summary": summary,
             "reporting_caution": (
                 "This ten-passage purposive CLDW check tests named-place recognition on source-derived historical writing only. "
-                "It is not external validation of the richer SH2026 ontology, journeys, affect or interpretation."
+                "It is not external validation of the richer SH2026 ontology, journeys, affect or interpretation. "
+                "The primary score uses exact character-span matching, so boundary conventions in the CLDW <cdplace> markup remain visible rather than being silently relaxed."
             ),
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
