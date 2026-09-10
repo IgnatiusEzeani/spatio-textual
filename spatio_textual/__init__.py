@@ -24,6 +24,16 @@ from .evaluation import (
     reference_spatial_reach,
     supported_reference_fraction,
 )
+from .llm_spans import (
+    FULL_SPATIAL_LABELS,
+    MODEL_CERTAINTY,
+    TOPONYM_LABELS,
+    LLMSpanExtractor,
+    build_span_prompt,
+    normalise_model_span,
+    span_audit_metrics,
+    span_response_schema,
+)
 from .journeys import (
     JOURNEY_FIELDS,
     JourneyExtractor,
@@ -61,6 +71,8 @@ __all__ = [
     "RuleGazetteerAnnotator", "load_teaching_gazetteer", "filter_supported_gold_labels",
     "MODEL_TO_GOLD_LABEL", "harmonize_ner_entities", "label_inventory", "reference_spans_for_ner",
     "reference_spatial_reach", "supported_reference_fraction",
+    "TOPONYM_LABELS", "FULL_SPATIAL_LABELS", "MODEL_CERTAINTY", "LLMSpanExtractor",
+    "build_span_prompt", "normalise_model_span", "span_audit_metrics", "span_response_schema",
     "JOURNEY_FIELDS", "JourneyExtractor", "build_journey_prompt", "normalise_model_journey",
     "validate_runtime_journey", "journey_field_status_counts",
     "JOURNEY_VALUE_FIELDS", "normalize_journey_value", "evidence_iou", "candidate_journey_match",
