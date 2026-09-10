@@ -23,8 +23,12 @@ jobs:
       HF_HOME: ${{ github.workspace }}/.cache/huggingface
       TOKENIZERS_PARALLELISM: "false"
       CLDW_COMMIT: 9042811cf590f694f9b635c4bc656ed4f81ca422
+      EXPECTED_CLDW_SHA256: 257a463e8dd5b154edb7951c8b8bb6d05f609043db17adaa2324d7290b06836c
       SH2026_HF_MODEL: dslim/bert-base-NER
       SH2026_HF_REVISION: 0b95561fd0c304538b5eb8a0ee532ca24dd009b9
+      # github.sha is a synthetic merge commit for pull_request events. Record
+      # the actual feature-branch head so an artefact can be reproduced exactly.
+      SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Check out SH2026 branch
         uses: actions/checkout@v4
@@ -60,14 +64,21 @@ jobs:
         run: |
           test "$(git -C cldw_upstream rev-parse HEAD)" = "$CLDW_COMMIT"
           echo "CLDW checkout verified at $CLDW_COMMIT"
+          echo "SH2026 branch head recorded as $SH2026_HEAD_SHA"
 
-      - name: Build source-derived validation passages
+      - name: Build and checksum source-derived validation passages
         run: |
           python benchmarks/sh2026/build_cldw_external_v1.py \
             --upstream-root cldw_upstream \
             --output sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl
           cp sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl.sha256 \
              sh2026_outputs/cldw_external_v1/dataset_checksum.sha256
+          DATASET_SHA=$(cut -d' ' -f1 sh2026_outputs/cldw_external_v1/dataset_checksum.sha256)
+          test "$DATASET_SHA" = "$EXPECTED_CLDW_SHA256" || {
+            echo "Derived CLDW checksum drifted: expected $EXPECTED_CLDW_SHA256, got $DATASET_SHA" >&2
+            exit 1
+          }
+          echo "Frozen derived CLDW checksum verified: $DATASET_SHA"
 
       - name: Validate derived gold and provenance
         run: |
@@ -82,6 +93,7 @@ jobs:
           assert_valid_gold(records)
           assert all({s["label"] for s in r["spans"]} <= {"TOPONYM"} for r in records)
           assert all(r["spans"] for r in records)
+          assert sum(len(r["spans"]) for r in records) == 43
           for record in records:
               source = record["source"]
               assert source["upstream_commit"] == "9042811cf590f694f9b635c4bc656ed4f81ca422"
@@ -91,29 +103,29 @@ jobs:
 
       - name: Run common-denominator named-place comparison
         run: |
-          DATASET_SHA=$(cut -d' ' -f1 sh2026_outputs/cldw_external_v1/dataset_checksum.sha256)
           python scripts/run_sh2026_external_ner.py \
             sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl \
             --methods rules,spacy,spacy_resources,hf \
             --spacy-model en_core_web_sm \
             --hf-model "$SH2026_HF_MODEL" \
             --hf-revision "$SH2026_HF_REVISION" \
-            --expected-sha256 "$DATASET_SHA" \
-            --frozen-at-commit "$GITHUB_SHA" \
+            --expected-sha256 "$EXPECTED_CLDW_SHA256" \
+            --frozen-at-commit "$SH2026_HEAD_SHA" \
             --out-dir sh2026_outputs/cldw_external_v1/results
 
       - name: Record external-validation provenance
         run: |
-          DATASET_SHA=$(cut -d' ' -f1 sh2026_outputs/cldw_external_v1/dataset_checksum.sha256)
           cat > sh2026_outputs/cldw_external_v1/provenance.json <<EOF
           {
-            "sh2026_git_sha": "$GITHUB_SHA",
+            "sh2026_branch_head_sha": "$SH2026_HEAD_SHA",
+            "workflow_sha": "$GITHUB_SHA",
             "cldw_repository": "UCREL/LakeDistrictCorpus",
             "cldw_commit": "$CLDW_COMMIT",
-            "dataset_sha256": "$DATASET_SHA",
+            "dataset_sha256": "$EXPECTED_CLDW_SHA256",
             "selection_manifest": "benchmarks/sh2026/cldw_external_manifest_v1.json",
             "selection_rule": "sh2026-cldw-paragraph-v1",
             "evaluation_scope": "TOPONYM recognition only",
+            "match_policy": "exact_character_span_and_harmonized_TOPONYM_label",
             "hf_model": "$SH2026_HF_MODEL",
             "hf_revision": "$SH2026_HF_REVISION"
           }
