@@ -151,6 +151,12 @@ python scripts/run_sh2026_llm_ner.py benchmarks/sh2026/holdout_v1.jsonl \
 
 After inference, `llm_ner_predictions.jsonl` can be re-scored with `--predictions` without another paid API call.
 
+### Draft-PR execution control
+
+GitHub only exposes `workflow_dispatch` after the workflow exists on the repository's default branch. While SH2026 remains on its draft feature branch, `.github/workflows/sh2026-llm-ner.yml` therefore also supports a deliberately narrow pull-request trigger: changing `.github/sh2026_llm_ner_scope` runs exactly the requested formal condition. Unrelated commits do not trigger paid inference.
+
+The repository secret `OPENAI_API_KEY` is a hard precondition. If it is absent, the workflow stops before building datasets or making an API call. Secrets must never be committed, echoed into logs, or passed as command-line arguments.
+
 ## 8. Release criterion
 
 The NER row is complete only after:
