@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "benchmarks/sh2026/**"
-      - "scripts/run_sh2026_benchmark.py"
-      - "scripts/run_sh2026_journey_benchmark.py"
+      - "projects/sh2026/benchmarks/**"
+      - "projects/sh2026/scripts/run_sh2026_benchmark.py"
+      - "projects/sh2026/scripts/run_sh2026_journey_benchmark.py"
       - "spatio_textual/**"
-      - "tutorials/sh2026/data/teaching_gazetteer.csv"
+      - "projects/sh2026/workshop/data/teaching_gazetteer.csv"
       - ".github/workflows/sh2026-benchmark.yml"
 
 jobs:
@@ -28,15 +28,15 @@ jobs:
 
       - name: Generate and verify frozen holdout
         run: |
-          python benchmarks/sh2026/build_holdout_v1.py
-          cd benchmarks/sh2026
+          python projects/sh2026/benchmarks/build_holdout_v1.py
+          cd projects/sh2026/benchmarks
           sha256sum -c holdout_v1.sha256
 
       - name: Validate reference annotations
         run: |
           python - <<'PY'
           from spatio_textual.gold import load_gold_jsonl, assert_valid_gold
-          path = "benchmarks/sh2026/holdout_v1.jsonl"
+          path = "projects/sh2026/benchmarks/holdout_v1.jsonl"
           records = load_gold_jsonl(path)
           assert len(records) == 30
           assert_valid_gold(records)
@@ -45,8 +45,8 @@ jobs:
 
       - name: Run deterministic, contextual and hybrid baseline benchmark
         run: |
-          python scripts/run_sh2026_benchmark.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_benchmark.py \
+            projects/sh2026/benchmarks/holdout_v1.jsonl \
             --methods rules,spacy,spacy_resources \
             --spacy-model en_core_web_sm \
             --benchmark-mode \
@@ -67,7 +67,7 @@ jobs:
           from spatio_textual.gold import load_gold_jsonl
           from spatio_textual.journeys import build_journey_prompt
 
-          benchmark = Path("benchmarks/sh2026/holdout_v1.jsonl")
+          benchmark = Path("projects/sh2026/benchmarks/holdout_v1.jsonl")
           benchmark_sha = hashlib.sha256(benchmark.read_bytes()).hexdigest()
           rows = load_gold_jsonl(benchmark)
           out = Path("sh2026_outputs/oracle_journey_predictions.jsonl")
@@ -103,8 +103,8 @@ jobs:
 
       - name: Smoke-test formal journey re-scoring path
         run: |
-          python scripts/run_sh2026_journey_benchmark.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_journey_benchmark.py \
+            projects/sh2026/benchmarks/holdout_v1.jsonl \
             --predictions sh2026_outputs/oracle_journey_predictions.jsonl \
             --benchmark-mode \
             --frozen-at-commit "$GITHUB_SHA" \
@@ -128,7 +128,7 @@ jobs:
           path: |
             sh2026_outputs/benchmark_v1/
             sh2026_outputs/journey_oracle_smoke/
-            benchmarks/sh2026/holdout_v1.jsonl
-            benchmarks/sh2026/holdout_v1.sha256
+            projects/sh2026/benchmarks/holdout_v1.jsonl
+            projects/sh2026/benchmarks/holdout_v1.sha256
           if-no-files-found: error
           retention-days: 30
