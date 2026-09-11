@@ -132,7 +132,7 @@ def analyse(text: str, *, link_places: bool = True) -> dict[str, Any]:
 def maybe_extract_journeys(text: str) -> dict[str, Any] | None:
     if not os.getenv("OPENAI_API_KEY"):
         return None
-    client = LLMClient(provider="openai", model="gpt-5.6-sol")
+    client = LLMClient(provider="openai")
     return JourneyExtractor(client=client).extract(text, file_id="demo", seg_id=1)
 
 
