@@ -40,8 +40,8 @@ jobs:
       - name: Install transformer journey environment
         run: |
           python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
           python -m pip install -e '.[transformers]'
-          python -m pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
           mkdir -p sh2026_outputs/journey_transformer_dev
           python -m pip freeze > sh2026_outputs/journey_transformer_dev/python_environment.txt
           python --version > sh2026_outputs/journey_transformer_dev/python_version.txt
