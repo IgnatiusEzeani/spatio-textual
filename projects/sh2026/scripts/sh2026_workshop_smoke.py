@@ -15,9 +15,10 @@ from spatio_textual.utils import Annotator, load_spacy_model
 from spatio_textual.viz import journeys_to_geojson, make_map_geojson, to_geojson
 
 
-ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "sh2026_outputs" / "release_smoke"
-GAZETTEER = ROOT / "tutorials" / "sh2026" / "data" / "teaching_gazetteer.csv"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = PROJECT_ROOT.parents[1]
+OUT = REPO_ROOT / "sh2026_outputs" / "release_smoke"
+GAZETTEER = PROJECT_ROOT / "workshop" / "data" / "teaching_gazetteer.csv"
 
 
 class FixedResolver:
@@ -47,6 +48,7 @@ class FixedResolver:
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    assert GAZETTEER.exists(), GAZETTEER
 
     qa_text = (
         "Q: Where did you live before the move?\n"
@@ -143,6 +145,7 @@ def main() -> None:
 
     report = {
         "status": "passed",
+        "project_root": str(PROJECT_ROOT),
         "qa_turns": len(turns),
         "rule_spans": len(rule_result["spans"]),
         "spacy_entities": len(spacy_result.get("entities") or []),
