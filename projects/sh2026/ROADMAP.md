@@ -1,6 +1,7 @@
 # Spatial Humanities 2026: Keynote, Tutorial and Demo Roadmap
 
-Working branch: `spatial-humanities-2026`
+Current cleanup branch: `spatial-humanities-2026-cleanup-work`  
+Target release branch: `spatial-humanities-2026`
 
 ## Goal
 
