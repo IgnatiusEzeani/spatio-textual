@@ -18,7 +18,7 @@ def test_demo_exposes_humanities_facing_evidence_views():
         "st.bar_chart",
         "render_journey_cards",
         "Source evidence",
-        "accept\", \"edit\", \"reject",
+        '["accept", "edit", "reject"]',
         "curated_teaching_fallback",
     ]:
         assert marker in source
