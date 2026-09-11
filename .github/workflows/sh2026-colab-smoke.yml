@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "tutorials/sh2026/**"
+      - "projects/sh2026/workshop/**"
       - "spatio_textual/**"
       - "requirements-lite.txt"
       - ".github/workflows/sh2026-colab-smoke.yml"
@@ -37,16 +37,16 @@ jobs:
         run: |
           set -euo pipefail
           notebooks=(
-            tutorials/sh2026/00_setup_and_orientation.ipynb
-            tutorials/sh2026/01_manual_annotation.ipynb
-            tutorials/sh2026/02_rules_and_gazetteers.ipynb
-            tutorials/sh2026/03_contextual_ner.ipynb
-            tutorials/sh2026/04_linking_and_ambiguity.ipynb
-            tutorials/sh2026/05_affect_and_events.ipynb
-            tutorials/sh2026/06_llm_structured_extraction.ipynb
-            tutorials/sh2026/07_compare_and_adjudicate.ipynb
-            tutorials/sh2026/08_from_text_to_map.ipynb
-            tutorials/sh2026/09_responsible_spatial_ai.ipynb
+            projects/sh2026/workshop/00_setup_and_orientation.ipynb
+            projects/sh2026/workshop/01_manual_annotation.ipynb
+            projects/sh2026/workshop/02_rules_and_gazetteers.ipynb
+            projects/sh2026/workshop/03_contextual_ner.ipynb
+            projects/sh2026/workshop/04_linking_and_ambiguity.ipynb
+            projects/sh2026/workshop/05_affect_and_events.ipynb
+            projects/sh2026/workshop/06_llm_structured_extraction.ipynb
+            projects/sh2026/workshop/07_compare_and_adjudicate.ipynb
+            projects/sh2026/workshop/08_from_text_to_map.ipynb
+            projects/sh2026/workshop/09_responsible_spatial_ai.ipynb
           )
           for nb in "${notebooks[@]}"; do
             name="$(basename "$nb" .ipynb)"
