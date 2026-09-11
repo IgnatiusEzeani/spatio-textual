@@ -58,61 +58,61 @@ By the end of the day, participants should be able to:
 | `08_from_text_to_map.ipynb` | Entity/journey GeoJSON, route audit and mapping | Implemented |
 | `09_responsible_spatial_ai.ipynb` | Provenance, uncertainty, governance and release audit | Implemented |
 
-All ten default CPU notebook paths have passed automated execution during SH2026 development. The release workflow now executes the checked-out PR/release candidate rather than cloning a previously published branch. A fresh current-head automated run plus a manual Google Colab rehearsal remain release gates.
+**Important:** “Implemented” means the notebook content and code path exist. It does not by itself mean a fresh manual Google Colab rehearsal has been completed for the final release candidate.
 
 ## Notebook sequence and teaching messages
 
 ### 00 · Setup and orientation — 30 min
 
-Location, locale and sense of place; install the SH2026 release; load public-safe examples; introduce the common schema.
+Introduce location, locale and sense of place; install the SH2026 branch; load public-safe teaching examples; introduce the common audit schema; and show the end-to-end destination.
 
 **Message:** spatial information in text is broader than named coordinates.
 
 ### 01 · Manual annotation — 35 min
 
-Annotate places, geo-nouns, relations, distance/time and subjective descriptors; compare judgements and expose span/ontology disagreement.
+Annotate places, geo-nouns, relations, distance/time and subjective descriptors; compare participant judgements with a documented reference; expose span, ontology and selection disagreement.
 
 **Message:** human annotation is interpretive too.
 
 ### 02 · Rules and gazetteers — 45 min
 
-Run deterministic EntityRuler/regex/gazetteer baselines and inspect both successful cases and brittle failures.
+Use bounded gazetteers/project resources, a deterministic EntityRuler/regex baseline, transparent failure analysis and latency/coverage measurements.
 
 **Message:** transparent and reproducible does not mean complete.
 
 ### 03 · Contextual NER — 55 min
 
-Compare contextual spaCy/HF recognition and distinguish within-ontology accuracy from representational reach.
+Separate contextual spaCy NER from spaCy + project resources; optionally compare HF NER; harmonise labels; distinguish within-ontology accuracy from representational reach.
 
 **Message:** context helps, but the training ontology still constrains what the model can see.
 
 ### 04 · Linking, ambiguity and historical geography — 40 min
 
-Separate recognition from resolution; inspect candidate ambiguity and preserve historical place identities rather than silently modernising them.
+Separate NER from entity resolution; inspect offline `GeoResolver` output, candidate ambiguity and historical polities; append human review rather than silently overwriting model output.
 
 **Message:** a coordinate is an interpretation, not simply an annotation.
 
 ### 05 · Affect and narrator-centred events — 50 min
 
-Compare sentiment/emotion signals and narrator-centred movement/action events while exposing lexical and domain assumptions.
+Compare sentiment/emotion rule baselines, inspect lexical cues and domain assumptions, optionally compare HF output, and examine narrator-centred movement/action events.
 
 **Message:** model-labelled affect is an analytical signal, not psychological ground truth.
 
 ### 06 · Evidence-first LLM structured extraction — 60 min
 
-Use a constrained journey schema, require literal evidence, compute offsets locally and preserve `explicit`, `contextual_inference` and `missing` provenance.
+Inspect the journey JSON contract, require verbatim source evidence, compute offsets locally, distinguish `explicit`, `contextual_inference` and `missing`, expose unsupported/schema-invalid output, and optionally make a live provider call. The default path already uses deterministic teaching clients and therefore does not require an API key.
 
 **Message:** the useful LLM pattern is constrained extraction + evidence + validation, not fluent generation.
 
 ### 07 · Compare, disagree and adjudicate — 45 min
 
-Compare methods without erasing disagreement; record accept/edit/reject review events and correction burden.
+Use model voting without erasing disagreement; accept/edit/reject review events; compare review burden with correction burden; and construct tidy comparison tables.
 
 **Message:** there is no single method winner across all dimensions.
 
 ### 08 · From text to map — 35–45 min
 
-Create point and journey GeoJSON, inspect unresolved-route audits, map where appropriate and retain non-map spatial representations such as co-occurrence.
+Create point and journey GeoJSON, inspect route audits, build a Folium map, compare textual nearness with Euclidean distance, and retain spatial evidence that should not be forced onto a point map.
 
 **Message:** mapping is one possible representation of spatial evidence, not its endpoint.
 
@@ -179,16 +179,18 @@ Every release candidate must:
 
 The operational go/no-go checklist is `projects/sh2026/docs/RELEASE_CHECKLIST.md`.
 
-## Instructor package
+## Instructor and fallback package
 
-`INSTRUCTOR_GUIDE.md` now provides the delivery sequence, troubleshooting guidance, no-network/no-API routes and 5-minute/15-minute contingencies. Before `sh2026-rc1`, the remaining packaging work is to freeze provenance-complete precomputed transformer/LLM fallbacks, record a fresh manual Colab run, and assemble the lightweight/offline teaching fallback.
+`INSTRUCTOR_GUIDE.md` provides the delivery sequence, troubleshooting guidance, no-network/no-API routes and 5-minute/15-minute contingencies. The hosted demo now also has a public-safe curated journey fallback (`projects/sh2026/demo/fallback_journeys_v1.json`) with evidence-grounding tests and explicit labelling that it is teaching material rather than an LLM prediction.
+
+Before `sh2026-rc1`, the remaining packaging work is narrower: freeze any retained **machine-generated** transformer/LLM fallback outputs with complete model/prompt/commit provenance, record a fresh manual Colab run, rehearse the hosted demo, and keep local presentation copies of the critical figures/notebooks.
 
 ## Current implementation block
 
-1. Keep current-head CI green after project disaggregation and notebook-path hardening.
+1. Keep current-head CI green after the evidence-first demo and fallback changes.
 2. Use `projects/sh2026/benchmarks/results_snapshot_v1.json` as the single reportable metric feed for the conference demo/keynote, rather than hard-coded UI numbers.
-3. Complete provenance-complete fallback outputs for optional heavyweight/API sections.
+3. Complete provenance-complete machine-output fallbacks only for optional heavyweight/API sections that genuinely need them; do not relabel curated teaching examples as model output.
 4. Rehearse the hosted Streamlit demo from a clean browser with no API key, then with optional live LLM access.
 5. Run the final manual Google Colab rehearsal and record it in the release checklist.
 
-The workshop core is structurally complete. The remaining work is release validation, fallback packaging and presentation rehearsal rather than notebook construction.
+The workshop core is structurally complete. The remaining work is release validation, selective machine-output fallback packaging and presentation rehearsal rather than notebook construction.
