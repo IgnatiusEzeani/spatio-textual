@@ -23,14 +23,26 @@ projects/sh2026/
 ├── README.md
 ├── ROADMAP.md
 ├── benchmarks/        # frozen and development research corpora/builders
+├── config/            # guarded experiment trigger/config files
 ├── docs/              # protocols, result records and keynote evidence
 ├── scripts/           # SH2026 experiment runners and training scripts
 ├── workshop/          # tutorial notebooks, data and instructor material
 └── demo/
-    └── app.py          # conference-specific Streamlit experience
+    └── streamlit_app.py   # conference-specific Streamlit experience
 ```
 
-GitHub Actions workflow definitions remain under `.github/workflows/`, because GitHub requires workflows there, but SH2026 workflows should reference resources under this project directory and should be guarded so routine package changes do not trigger paid or heavyweight conference experiments.
+GitHub Actions workflow definitions remain under `.github/workflows/`, because GitHub requires workflows there, but SH2026 workflows reference resources under this project directory and are guarded so routine package changes do not repeat paid conference experiments.
+
+## Run the conference demo locally
+
+From the repository root:
+
+```bash
+python -m pip install -r requirements-lite.txt
+streamlit run projects/sh2026/demo/streamlit_app.py
+```
+
+The public-safe guided path does not require an API key. Live LLM journey extraction is optional and uses a server-side `OPENAI_API_KEY` when configured.
 
 ## Release relationship
 
@@ -40,3 +52,7 @@ The intended release relationship is:
 - **SH2026 resources**: reproducible research/teaching layer pinned to a known package release or commit.
 
 The SH2026 benchmark results are not package guarantees. They are project-specific empirical results with explicit provenance and claim boundaries.
+
+## SH2026 completion gate
+
+Before the conference release is considered ready, the project should have: the NER, journey and affect comparison rows frozen; the package/project boundary regression-tested; all ten workshop notebooks passing in a clean CPU environment; the project-scoped Streamlit health check passing without an API key; package tests and compatibility checks green; and the deployed demo rehearsed using only public-safe material.
