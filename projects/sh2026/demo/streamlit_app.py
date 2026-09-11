@@ -16,7 +16,7 @@ from spatio_textual.evaluation import harmonize_ner_entities
 from spatio_textual.journeys import JOURNEY_FIELDS, JourneyExtractor, normalise_model_journey
 from spatio_textual.llm import LLMClient
 from spatio_textual.provenance import build_run_manifest
-from spatio_textual.review import apply_human_review
+from spatio_textual.review import apply_human_review, apply_place_review
 from spatio_textual.rules import RuleGazetteerAnnotator
 from spatio_textual.sentiment import SentimentAnalyzer
 from spatio_textual.utils import Annotator, load_spacy_model
@@ -154,6 +154,8 @@ def maybe_extract_journeys(text: str) -> dict[str, Any] | None:
         return None
     client = LLMClient(provider="openai")
     result = JourneyExtractor(client=client).extract(text, file_id="demo", seg_id=1)
+    if any(row.get("success") is False for row in result.get("telemetry", []) if isinstance(row, dict)):
+        raise RuntimeError("The live provider could not complete journey extraction.")
     result["demo_source"] = "live_llm"
     return result
 
@@ -487,8 +489,10 @@ elif page == "Analyse":
                 if wants_live and os.getenv("OPENAI_API_KEY"):
                     try:
                         journey_result = maybe_extract_journeys(text)
-                    except Exception as exc:
-                        st.session_state.journey_notes = [f"Live journey extraction failed: {exc}"]
+                    except Exception:
+                        st.session_state.journey_notes = [
+                            "Live journey extraction is unavailable. Automatic mode uses a teaching fallback where available."
+                        ]
                 if journey_result is None and wants_fallback and exact_teaching_example:
                     journey_result = fallback_journey_result(example_id, text)
                 if journey_result is None and journey_mode != "Live LLM: server-configured":
@@ -611,7 +615,7 @@ elif page == "Review":
                     kwargs: dict[str, Any] = {}
                     if decision == "edit":
                         kwargs = {"field": "resolved_name", "new_value": replacement}
-                    records[0]["entities"][index] = apply_human_review(
+                    records[0]["entities"][index] = apply_place_review(
                         entity,
                         action=decision,
                         reason=reason,
@@ -619,6 +623,8 @@ elif page == "Review":
                     )
                     st.session_state.analysis["records"] = records
                     st.success("Review appended to the audit trail; the original machine value remains in the edit event.")
+                    if decision == "edit":
+                        st.info("The corrected place remains unresolved. Previous coordinates have been cleared until its location is verified.")
 
         st.markdown("### Journey review")
         if not st.session_state.journeys:
