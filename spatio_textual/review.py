@@ -77,6 +77,34 @@ def apply_human_review(
     return out
 
 
+def apply_place_review(record: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+    """Review a place, invalidating geocoding after a resolved-name edit.
+
+    A corrected name alone does not establish coordinates. Preserve the previous
+    resolution in the append-only edit trail and keep the place reviewable.
+    """
+    out = apply_human_review(record, **kwargs)
+    if kwargs.get("action") != "edit" or kwargs.get("field") != "resolved_name":
+        return out
+    cleared = {
+        "lat": None, "lon": None, "latitude": None, "longitude": None,
+        "place_type_resolved": None, "geo_source": None, "geo_confidence": None,
+        "geonameid": None, "countrycode": None,
+        "candidates": [], "candidates_count": 0, "ambiguous": False,
+        "resolution_status": "unresolved",
+        "review_reason": "Place name edited; coordinates require verification.",
+    }
+    for field, value in cleared.items():
+        if field in out or field in {"lat", "lon", "resolution_status", "review_reason"}:
+            out = apply_human_review(
+                out, action="edit", field=field, new_value=value,
+                reason="correction", editor=kwargs.get("editor", "session_user"),
+                timestamp=kwargs.get("timestamp"), resolve_review=False,
+            )
+    out["requires_review"] = True
+    return out
+
+
 def human_correction_burden(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """Summarise human review/correction burden for benchmark tables.
 

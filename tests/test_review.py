@@ -74,3 +74,36 @@ def test_correction_burden_distinguishes_review_from_correction():
     assert summary["correction_rate"] == 0.5
     assert summary["human_edit_events"] == 3
     assert summary["edited_fields"] == ["end_location"]
+
+
+def test_place_name_correction_clears_geometry_and_preserves_audit():
+    from spatio_textual.review import apply_place_review
+    from spatio_textual.viz import to_geojson
+
+    entity = {
+        'text': 'Cambridge', 'label': 'GPE', 'resolved_name': 'Cambridge',
+        'lat': 52.2, 'lon': 0.12, 'latitude': 52.2, 'longitude': 0.12,
+        'geo_source': 'machine', 'geo_confidence': 0.8,
+        'geonameid': 123, 'countrycode': 'GB', 'place_type_resolved': 'CITY',
+        'candidates': [{'name': 'Cambridge', 'lat': 52.2, 'lon': 0.12}],
+        'candidates_count': 1, 'ambiguous': True,
+        'resolution_status': 'resolved_ambiguous', 'requires_review': True,
+        'human_edits': [{'action': 'accept', 'reason': 'human_flag'}],
+    }
+    result = apply_place_review(entity, action='edit', field='resolved_name',
+                               new_value='Cambridge, Massachusetts')
+    assert result['resolved_name'] == 'Cambridge, Massachusetts'
+    assert result['requires_review'] is True
+    assert result['resolution_status'] == 'unresolved'
+    assert result['candidates'] == []
+    assert result['geo_source'] is None
+    assert result['geonameid'] is None
+    assert result['countrycode'] is None
+    assert to_geojson([{'entities': [result]}])['features'] == []
+    assert result['human_edits'][0] == entity['human_edits'][0]
+    assert any(e.get('field') == 'lat' and e['old_value'] == 52.2
+               for e in result['human_edits'])
+    assert entity['lat'] == 52.2  # the original prediction is untouched
+    accepted = apply_place_review(entity, action='accept')
+    assert accepted['lat'] == 52.2
+    assert accepted['resolved_name'] == 'Cambridge'
