@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 import time
 from collections import Counter
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
+
+import spacy
 
 ROLE_NAMES = ("TRIGGER", "SOURCE", "DESTINATION", "TRANSPORT", "TIME", "REASON")
 LABELS = ("O",) + tuple(label for role in ROLE_NAMES for label in (f"B-{role}", f"I-{role}"))
@@ -36,6 +38,11 @@ TRANSPORT_SURFACES = {
     "bicycle": ("bicycle", "bike"),
     "foot": ("foot",),
     "lorry": ("lorry", "truck"),
+}
+TRANSPORT_ALIASES = {
+    surface.casefold(): normalized
+    for normalized, surfaces in TRANSPORT_SURFACES.items()
+    for surface in surfaces
 }
 IMPLIED_TRANSPORT = {
     "walked": "foot", "walk": "foot",
@@ -85,20 +92,12 @@ def _find_trigger(text: str) -> tuple[int, int] | None:
     matches = list(TRIGGER_RE.finditer(text))
     if not matches:
         return None
-    # Context windows may include a preceding sentence. The journey trigger is
-    # normally the final movement predicate in the evidence window.
     match = matches[-1]
     return match.start(), match.end()
 
 
 def journey_training_instances(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Project structured development references into token-role instances.
-
-    Explicit values are grounded against the reference evidence. Inferred
-    transport values with no literal surface form are intentionally not forced
-    into token labels; the downstream extractor may infer them from a predicted
-    movement trigger through a transparent mapping.
-    """
+    """Project structured development references into token-role instances."""
     splits = development_record_splits(records)
     instances: list[dict[str, Any]] = []
     for record in records:
@@ -220,7 +219,7 @@ class TransformerJourneyExtractor:
         try:
             import torch
             from transformers import AutoModelForTokenClassification, AutoTokenizer
-        except Exception as exc:  # pragma: no cover - optional dependency
+        except Exception as exc:  # pragma: no cover
             raise RuntimeError("Transformer journey extraction requires the `transformers` optional dependency") from exc
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
