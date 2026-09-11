@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "benchmarks/sh2026/**"
-      - "scripts/run_sh2026_benchmark.py"
+      - "projects/sh2026/benchmarks/**"
+      - "projects/sh2026/scripts/run_sh2026_benchmark.py"
       - "spatio_textual/benchmark.py"
       - "spatio_textual/evaluation.py"
       - "spatio_textual/gold.py"
@@ -47,15 +47,15 @@ jobs:
 
       - name: Generate and verify frozen holdout
         run: |
-          python benchmarks/sh2026/build_holdout_v1.py
-          cd benchmarks/sh2026
+          python projects/sh2026/benchmarks/build_holdout_v1.py
+          cd projects/sh2026/benchmarks
           sha256sum -c holdout_v1.sha256
 
       - name: Validate reference annotations
         run: |
           python - <<'PY'
           from spatio_textual.gold import load_gold_jsonl, assert_valid_gold
-          path = "benchmarks/sh2026/holdout_v1.jsonl"
+          path = "projects/sh2026/benchmarks/holdout_v1.jsonl"
           records = load_gold_jsonl(path)
           assert len(records) == 30
           assert_valid_gold(records)
@@ -64,8 +64,8 @@ jobs:
 
       - name: Run four-condition benchmark including revision-pinned HF transformer
         run: |
-          python scripts/run_sh2026_benchmark.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_benchmark.py \
+            projects/sh2026/benchmarks/holdout_v1.jsonl \
             --methods rules,spacy,spacy_resources,hf \
             --spacy-model en_core_web_sm \
             --hf-model "$SH2026_HF_MODEL" \
@@ -95,7 +95,7 @@ jobs:
           name: sh2026-benchmark-v1-hf-${{ github.run_id }}
           path: |
             sh2026_outputs/benchmark_v1_hf/
-            benchmarks/sh2026/holdout_v1.jsonl
-            benchmarks/sh2026/holdout_v1.sha256
+            projects/sh2026/benchmarks/holdout_v1.jsonl
+            projects/sh2026/benchmarks/holdout_v1.sha256
           if-no-files-found: error
           retention-days: 30
