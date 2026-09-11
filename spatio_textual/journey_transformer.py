@@ -361,54 +361,76 @@ class TransformerJourneyExtractor:
         journeys: list[dict[str, Any]] = []
 
         for index, sent in enumerate(sentences):
-            window_start = sentences[index - 1].start_char if index > 0 else sent.start_char
-            window_end = sent.end_char
-            window = source[window_start:window_end]
-            current_start = sent.start_char - window_start
-            current_end = sent.end_char - window_start
-            spans = self._predict_spans(window)
-            triggers = [
-                span for span in spans
-                if span.get("role") == "TRIGGER" and int(span["start_char"]) >= current_start and int(span["end_char"]) <= current_end
-            ]
+            sentence_text = sent.text
+            spans = self._predict_spans(sentence_text)
+            triggers = [span for span in spans if span.get("role") == "TRIGGER"]
+
             for trigger in triggers:
+                sentence_start = 0
+                sentence_end = len(sentence_text)
                 source_span = _pick_role(
                     spans,
                     "SOURCE",
                     trigger,
-                    current_start=current_start,
-                    current_end=current_end,
-                    allow_previous_context=True,
+                    current_start=sentence_start,
+                    current_end=sentence_end,
                 )
                 destination_span = _pick_role(
                     spans,
                     "DESTINATION",
                     trigger,
-                    current_start=current_start,
-                    current_end=current_end,
+                    current_start=sentence_start,
+                    current_end=sentence_end,
                     prefer_after=True,
                 )
                 transport_span = _pick_role(
                     spans,
                     "TRANSPORT",
                     trigger,
-                    current_start=current_start,
-                    current_end=current_end,
+                    current_start=sentence_start,
+                    current_end=sentence_end,
                 )
                 time_span = _pick_role(
                     spans,
                     "TIME",
                     trigger,
-                    current_start=current_start,
-                    current_end=current_end,
+                    current_start=sentence_start,
+                    current_end=sentence_end,
                 )
                 reason_span = _pick_role(
                     spans,
                     "REASON",
                     trigger,
-                    current_start=current_start,
-                    current_end=current_end,
+                    current_start=sentence_start,
+                    current_end=sentence_end,
                 )
+
+                source_inherited = False
+                if source_span is None and index > 0:
+                    previous = sentences[index - 1]
+                    context_start_global = previous.start_char
+                    context_end_global = sent.end_char
+                    context_text = source[context_start_global:context_end_global]
+                    current_start_in_context = sent.start_char - context_start_global
+                    context_spans = self._predict_spans(context_text)
+                    context_trigger = {
+                        "role": "TRIGGER",
+                        "start_char": current_start_in_context + int(trigger["start_char"]),
+                        "end_char": current_start_in_context + int(trigger["end_char"]),
+                        "text": trigger["text"],
+                    }
+                    candidate_source = _pick_role(
+                        context_spans,
+                        "SOURCE",
+                        context_trigger,
+                        current_start=current_start_in_context,
+                        current_end=len(context_text),
+                        allow_previous_context=True,
+                    )
+                    if candidate_source is not None and int(candidate_source["start_char"]) < current_start_in_context:
+                        source_span = candidate_source
+                        source_inherited = True
+
                 if source_span is None and destination_span is None:
                     continue
 
@@ -425,21 +447,16 @@ class TransformerJourneyExtractor:
                         transport = implied
                         transport_status = "contextual_inference"
 
-                def span_status(span: dict[str, Any] | None) -> str:
-                    if span is None:
-                        return "missing"
-                    return "explicit" if int(span["start_char"]) >= current_start else "contextual_inference"
-
                 statuses = {
-                    "start_location": span_status(source_span),
-                    "end_location": span_status(destination_span),
+                    "start_location": "contextual_inference" if source_inherited else ("explicit" if source_span is not None else "missing"),
+                    "end_location": "explicit" if destination_span is not None else "missing",
                     "transport_mode": transport_status,
-                    "date": span_status(time_span),
-                    "journey_reason": span_status(reason_span),
+                    "date": "explicit" if time_span is not None else "missing",
+                    "journey_reason": "explicit" if reason_span is not None else "missing",
                 }
                 contextual = any(status == "contextual_inference" for status in statuses.values())
-                uses_previous = source_span is not None and int(source_span["start_char"]) < current_start
-                evidence_start = window_start if uses_previous else sent.start_char
+
+                evidence_start = sentences[index - 1].start_char if source_inherited and index > 0 else sent.start_char
                 evidence_end = sent.end_char
                 evidence = source[evidence_start:evidence_end]
 
