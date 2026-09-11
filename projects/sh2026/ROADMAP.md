@@ -21,28 +21,59 @@ Use one end-to-end research story:
 
 At each stage, expose at least two methodological choices and their trade-offs. Preserve source evidence and provenance throughout.
 
+## Current project state
+
+The repository disaggregation and validation phase is complete on the cleanup branch.
+
+- SH2026-specific research, teaching, benchmark, demo and test assets are consolidated under `projects/sh2026/`.
+- `spatio_textual/` remains the reusable package layer and is protected by package/project boundary tests.
+- All ten workshop notebooks are present under `projects/sh2026/workshop/`.
+- The clean CPU/default notebook path has passed the SH2026 Colab smoke workflow.
+- The reusable package tests and Python compatibility matrix are green.
+- SH2026 benchmark, rules, Hugging Face, journey, affect and CLDW external-validation workflows are green at the current PR head.
+- `holdout_v1` is frozen and checksum-protected. It is a synthetic held-out benchmark and must not be used for further tuning while still being described as held out.
+- Paid LLM workflows remain explicitly guarded and are not run automatically by routine package/refactor changes.
+- The conference demo has one canonical entry point: `projects/sh2026/demo/streamlit_app.py`.
+- A draft pull request targets `spatial-humanities-2026`; no merge has been performed.
+
 ## Deliverables
 
 ### A. Full-day Colab tutorial
 
-- Landing notebook with setup, learning goals and schedule.
-- Notebook 1: text, spatial humanities and baseline/manual annotation.
-- Notebook 2: rule-based and spaCy entity extraction.
-- Notebook 3: transformer NER and model comparison.
-- Notebook 4: sentiment/emotion and narrator-centred events.
-- Notebook 5: LLM-assisted structured extraction and prompt/schema design.
-- Notebook 6: entity linking, ambiguity, human review and adjudication.
-- Notebook 7: GeoJSON, co-occurrence, maps and interpretation.
-- Instructor notebook / answer key.
-- Precomputed outputs so the workshop remains usable without API keys or GPU availability.
+Current notebook sequence:
+
+1. `00_setup_and_orientation.ipynb`
+2. `01_manual_annotation.ipynb`
+3. `02_rules_and_gazetteers.ipynb`
+4. `03_contextual_ner.ipynb`
+5. `04_linking_and_ambiguity.ipynb`
+6. `05_affect_and_events.ipynb`
+7. `06_llm_structured_extraction.ipynb`
+8. `07_compare_and_adjudicate.ipynb`
+9. `08_from_text_to_map.ipynb`
+10. `09_responsible_spatial_ai.ipynb`
+
+The workshop core is implemented and smoke-tested. Remaining tutorial work is release hardening rather than basic notebook construction:
+
+- create/finalise the instructor guide and troubleshooting material;
+- freeze expected outputs/reference artefacts;
+- generate provenance-bearing precomputed transformer/LLM fallbacks;
+- prepare offline/lightweight contingency material;
+- rehearse timing and shorten exercises where needed.
 
 ### B. Hosted demo
 
-Build from the existing `app.py`, retaining the current model selection, review queue, telemetry and export functionality.
+The canonical conference application is:
 
-Priority additions:
+```bash
+streamlit run projects/sh2026/demo/streamlit_app.py
+```
 
-- clear Home / Annotate / Compare / Explore / About workflow;
+The public-safe default path must work without an API key.
+
+Priority additions for the next implementation phase:
+
+- clear Home / Annotate / Compare / Explore / Review / About workflow;
 - side-by-side source text and extracted annotations;
 - visible method comparison for rule/spaCy/HF/LLM outputs;
 - interactive map rather than raw GeoJSON only;
@@ -52,7 +83,7 @@ Priority additions:
 - curated public-safe example texts and presets;
 - hosted deployment with cached models, graceful API-key handling and a lightweight default mode.
 
-Stretch goal: add schema-constrained journey extraction with origin, destination, transport, date/reason and evidence quote.
+Stretch goal: schema-constrained journey extraction with origin, destination, transport, date/reason and evidence quote.
 
 ### C. Keynote lecture
 
@@ -60,10 +91,10 @@ Provisional thesis:
 
 > AI does not make traditional Spatial Humanities methods obsolete. It changes where the bottlenecks lie: from finding explicit spatial signals to validating, interpreting and governing increasingly rich machine-generated representations of human experience.
 
-Proposed comparative spine:
+Comparative spine:
 
 1. Manual annotation: interpretively rich, transparent, expensive and difficult to scale.
-2. Rule/gazetteer methods: deterministic, fast, reproducible and excellent on bounded tasks, but brittle outside the anticipated vocabulary and forms.
+2. Rule/gazetteer methods: deterministic, fast, reproducible and excellent on bounded tasks, but brittle outside anticipated vocabulary and forms.
 3. Statistical/transformer NLP: contextual and scalable, but dependent on training domains, label inventories and benchmark assumptions.
 4. LLMs: flexible structured extraction, implicit relations and rapid adaptation, but with hallucination, opacity, cost, non-determinism and governance risks.
 5. Hybrid/human-in-the-loop workflows: use each method where it is strongest and retain evidence, disagreement and provenance.
@@ -73,73 +104,6 @@ Anchor case studies:
 - Lake District writing: named places, geo-nouns, picturesque/wild descriptions and textual proximity.
 - Holocaust survivor testimonies: Q/A-aware segmentation, journeys, affect and evidence-grounded extraction.
 - Curatorial/archival workflow: AI as review and discovery support rather than automated historical authority.
-
-## One-week sprint
-
-### Day 1: Audit, scope and freeze the teaching schema
-
-- Verify current v0.3 installation and tests.
-- Freeze a common annotation schema for notebooks, app and keynote.
-- Select 3-4 public-safe teaching texts.
-- Define the comparison matrix and evaluation measures.
-- Create notebook skeletons and demo information architecture.
-
-Exit criterion: every later deliverable uses the same fields, examples and terminology.
-
-### Day 2: Build tutorial core
-
-- Implement setup/landing notebook.
-- Implement manual/rule/spaCy notebooks.
-- Add exercises and expected outputs.
-- Add lightweight install path and precomputed fallback results.
-
-Exit criterion: morning half of workshop runs end-to-end in a fresh Colab runtime.
-
-### Day 3: Build advanced tutorial
-
-- Add HF model comparison.
-- Add sentiment/emotion/events.
-- Add LLM structured extraction with optional API-key cells.
-- Add adjudication and telemetry exercises.
-
-Exit criterion: full workshop can run without forcing every participant to call a paid API.
-
-### Day 4: Upgrade hosted demo
-
-- Refactor app into user-facing sections/pages.
-- Add highlighted annotation view, comparison table and proper map.
-- Add affect/narrative visualisation and review UI.
-- Add public-safe examples and explanatory text.
-
-Exit criterion: a non-technical humanities researcher can understand what happened to their text without opening JSON.
-
-### Day 5: Deployment and robustness
-
-- Run tests and add smoke tests for tutorial/demo paths.
-- Test Docker/Hugging Face Space and/or Streamlit deployment.
-- Cache models and handle unavailable heavyweight/LLM backends cleanly.
-- Test on desktop and projector-sized displays.
-
-Exit criterion: stable public URL plus a fully offline/lightweight fallback.
-
-### Day 6: Keynote deck architecture
-
-- Create a 45-55 minute slide storyboard.
-- Reuse outputs generated by the tutorial and demo as keynote evidence.
-- Build the central comparison graphic and 3-4 signature visualisations.
-- Draft opening, transitions and conclusion.
-
-Exit criterion: complete slide-by-slide narrative before visual polishing.
-
-### Day 7: Integration and rehearsal package
-
-- Run the workshop as a participant from a clean environment.
-- Run the public demo from a fresh browser/session.
-- Rehearse the talk against the live demo/screenshots.
-- Freeze release candidate, links and QR codes.
-- Produce a facilitator checklist and failure-mode backup plan.
-
-Exit criterion: tutorial, demo and keynote tell one coherent story and can survive network/API/model failure.
 
 ## Evaluation matrix for the keynote and tutorial
 
@@ -158,14 +122,40 @@ Compare methods on:
 - privacy/data-governance risk;
 - suitability for sensitive collections.
 
-Avoid presenting the methods as a simple linear progression from 'old' to 'better'. The strongest argument is methodological complementarity.
+Avoid presenting the methods as a simple linear progression from "old" to "better". The stronger argument is methodological complementarity.
+
+## Immediate next implementation block
+
+### 1. Demo integration
+
+Refactor the canonical Streamlit app around the conference user journey, while reusing the same schema, benchmark terminology, review events and provenance structures already used by the workshop.
+
+Exit criterion: a non-technical humanities researcher can understand what happened to a text without reading raw JSON.
+
+### 2. Workshop release package
+
+Create the instructor guide, expected outputs, precomputed fallback artefacts, troubleshooting notes and contingency exercises.
+
+Exit criterion: the workshop remains usable when network, GPU or paid APIs are unavailable.
+
+### 3. Keynote evidence pack
+
+Turn validated benchmark/external-validation outputs into a small set of defensible tables and signature figures. Separate synthetic holdout evidence from source-derived external validation explicitly.
+
+Exit criterion: every quantitative keynote claim points to a reproducible experiment/result record and does not over-generalise from synthetic data.
+
+### 4. Public deployment and rehearsal
+
+Deploy the demo, test it from a fresh browser/session, run the workshop as a participant, rehearse keynote transitions around live/demo fallback states, and freeze QR codes/links.
+
+Exit criterion: tutorial, demo and keynote tell one coherent story and survive network/API/model failure.
 
 ## Scope guardrails
 
-For the one-week sprint, do not attempt to build a general-purpose GIS platform, full RAG copilot, multimodal audio/video pipeline or archive-scale production system. The target is a polished research/teaching demonstrator with clear provenance and defensible comparisons.
+Do not turn the project into a general-purpose GIS platform, full RAG copilot, multimodal audio/video pipeline or archive-scale production system before the conference release. The target is a polished research/teaching demonstrator with clear provenance and defensible comparisons.
 
 Controlled-access Holocaust testimony text must not be bundled into the public repository or Colab notebooks. Use public-safe excerpts where permissions allow, synthetic structurally realistic examples, or precomputed aggregate outputs.
 
 ## Release target
 
-Tag the integrated release only after tutorial and demo smoke tests pass. Suggested milestone name: `sh2026-rc1`.
+The integrated release should only be tagged after the tutorial release package, hosted demo and keynote evidence pack pass their final rehearsal checks. Suggested milestone name: `sh2026-rc1`.
