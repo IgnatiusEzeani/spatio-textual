@@ -1,0 +1,72 @@
+name: SH2026 documentation path migration
+
+on:
+  push:
+    branches:
+      - spatial-humanities-2026-cleanup-work
+    paths:
+      - ".github/workflows/sh2026-doc-path-migration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spatial-humanities-2026-cleanup-work
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rewrite removed SH2026 paths in live documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path("projects/sh2026")
+          replacements = {
+              "benchmarks/sh2026/": "projects/sh2026/benchmarks/",
+              "tutorials/sh2026/": "projects/sh2026/workshop/",
+              "docs/sh2026/": "projects/sh2026/docs/",
+              "scripts/run_sh2026_": "projects/sh2026/scripts/run_sh2026_",
+              "scripts/generate_sh2026_": "projects/sh2026/scripts/generate_sh2026_",
+              "scripts/train_sh2026_": "projects/sh2026/scripts/train_sh2026_",
+              ".github/sh2026_llm_ner_scope": "projects/sh2026/config/llm_ner_scope",
+              "tests/test_sh2026_holdout.py": "projects/sh2026/tests/test_sh2026_holdout.py",
+              "tests/test_gold.py": "projects/sh2026/tests/test_gold_reference.py",
+          }
+
+          changed = []
+          for path in sorted(root.rglob("*.md")):
+              original = path.read_text(encoding="utf-8")
+              updated = original
+              for old, new in replacements.items():
+                  updated = updated.replace(old, new)
+              if updated != original:
+                  path.write_text(updated, encoding="utf-8")
+                  changed.append(str(path))
+
+          print("Updated documentation files:")
+          for path in changed:
+              print(" -", path)
+          if not changed:
+              print(" - none")
+          PY
+
+      - name: Commit migrated documentation
+        run: |
+          if git diff --quiet; then
+            echo "No documentation paths required migration."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add projects/sh2026
+          git commit -m "docs(sh2026): migrate remaining project paths [doc-migrated]"
+          git push origin HEAD:spatial-humanities-2026-cleanup-work
