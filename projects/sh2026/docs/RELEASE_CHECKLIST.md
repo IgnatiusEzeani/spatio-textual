@@ -74,11 +74,20 @@ Runtime/Python:
 Notes:
 ```
 
-## 4. Precomputed fallback pack
+## 4. Fallback and contingency pack
 
-Precomputed outputs are teaching/reliability assets, not substitutes for provenance.
+Fallback material must be explicit about what it is. A curated teaching example is not a model prediction; a cached model output is not a live run.
 
-For every retained transformer or LLM fallback:
+For **curated teaching fallbacks**:
+
+- [ ] source example identifier is recorded;
+- [ ] source text is public-safe and distribution status is recorded;
+- [ ] evidence quotations are exact substrings of the source;
+- [ ] schema/version is recorded;
+- [ ] the UI/notebook labels the output as instructor-curated and not benchmark evidence;
+- [ ] edited source text never silently receives a fallback prepared for the original passage.
+
+For every retained **transformer or LLM model-output fallback**:
 
 - [ ] source example identifier is recorded;
 - [ ] backend/provider/model is recorded;
@@ -98,13 +107,16 @@ Do not hand-edit a machine output and continue to describe it as raw model outpu
 - [ ] `streamlit run projects/sh2026/demo/streamlit_app.py` starts successfully in the release environment.
 - [ ] Home, Analyse, Compare, Explore, Review and About pages load.
 - [ ] Public-safe examples load correctly.
+- [ ] Source spans render as highlighted evidence rather than only raw JSON/tables.
+- [ ] Affect distributions render as readable charts and retain the model-signal caveat.
+- [ ] Structured journeys render as evidence cards with explicit/contextual/missing provenance.
 - [ ] The no-API-key path is fully usable.
+- [ ] The curated journey fallback is visibly labelled as teaching material, not an LLM result.
 - [ ] Missing/failed optional LLM access degrades gracefully.
 - [ ] Named-place resolution exposes ambiguity/unresolved state rather than silently forcing a coordinate.
 - [ ] Affect is described as model-labelled signal, not psychological fact.
-- [ ] Journey evidence remains visible with explicit/inferred/missing provenance.
-- [ ] Human review produces an additive audit trail.
-- [ ] Map view preserves unresolved/unmappable evidence in an audit table.
+- [ ] Human review exposes accept/edit/reject and produces an additive audit trail.
+- [ ] Map view preserves unresolved/unmappable evidence in an audit table or accompanying textual view.
 - [ ] Provenance page reports run manifest and telemetry without secrets.
 - [ ] Hosted deployment is tested from an incognito/private browser session.
 - [ ] A screenshot or recorded walkthrough exists as a presentation fallback.
@@ -117,6 +129,8 @@ Do not hand-edit a machine output and continue to describe it as raw model outpu
 - [ ] CLDW external-validation claims match the documented external-validation protocol.
 - [ ] NER, journey and affect results used in slides can be traced to a results document/run artifact.
 - [ ] Every keynote metric has task, dataset, method/model and evaluation definition attached.
+- [ ] `results_snapshot_v1.json` remains the single reportable feed used by the demo/keynote figure generator.
+- [ ] Any condition marked `not_reportable` remains excluded from scored public tables/figures.
 - [ ] The talk distinguishes within-ontology accuracy from representational reach.
 - [ ] Review/correction burden is discussed where richer methods increase human validation work.
 - [ ] No method is presented as a universal winner based on a single metric.
@@ -156,7 +170,7 @@ Do not hand-edit a machine output and continue to describe it as raw model outpu
 1. required automated checks are green at the release commit;
 2. all ten default notebook paths have both automated CPU validation and at least one fresh manual Colab rehearsal;
 3. the hosted demo works without an API key;
-4. fallback outputs are provenance-complete;
+4. fallback/contingency material is provenance-complete and correctly labelled;
 5. benchmark/keynote claims are traceable to frozen evidence;
 6. public-safe data boundaries have been checked;
 7. presentation fallbacks have been rehearsed.
