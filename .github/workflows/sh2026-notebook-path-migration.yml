@@ -1,0 +1,110 @@
+name: SH2026 notebook path migration
+
+on:
+  push:
+    branches:
+      - spatial-humanities-2026-cleanup-work
+    paths:
+      - ".github/workflows/sh2026-notebook-path-migration.yml"
+      - "projects/sh2026/workshop/**"
+      - "projects/sh2026/tests/test_project_paths.py"
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ !contains(github.event.head_commit.message, '[notebook-migrated]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: spatial-humanities-2026-cleanup-work
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rewrite legacy SH2026 notebook paths
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path("projects/sh2026/workshop")
+
+          def migrate_source(source: str) -> str:
+              source = source.replace(
+                  'cwd/"tutorials"/"sh2026"',
+                  'cwd/"projects"/"sh2026"',
+              )
+              source = source.replace(
+                  'repo_dir/"tutorials"/"sh2026"',
+                  'repo_dir/"projects"/"sh2026"/"workshop"',
+              )
+              source = source.replace(
+                  'repo_dir/"benchmarks"/"sh2026"',
+                  'repo_dir/"projects"/"sh2026"/"benchmarks"',
+              )
+              source = source.replace(
+                  'repo_dir/"docs"/"sh2026"',
+                  'repo_dir/"projects"/"sh2026"/"docs"',
+              )
+              source = source.replace(
+                  'repo_dir/"scripts"',
+                  'repo_dir/"projects"/"sh2026"/"scripts"',
+              )
+              source = source.replace("tutorials/sh2026/", "projects/sh2026/workshop/")
+              source = source.replace("docs/sh2026/", "projects/sh2026/docs/")
+              source = source.replace("benchmarks/sh2026/", "projects/sh2026/benchmarks/")
+              source = re.sub(
+                  r'(?<!projects/sh2026/)scripts/(run|generate|train)_sh2026_',
+                  r'projects/sh2026/scripts/\1_sh2026_',
+                  source,
+              )
+              source = source.replace(
+                  "sh2026_app.py",
+                  "projects/sh2026/demo/streamlit_app.py",
+              )
+              return source
+
+          changed = []
+          for path in sorted(root.glob("*.ipynb")):
+              notebook = json.loads(path.read_text(encoding="utf-8"))
+              touched = False
+              for cell in notebook.get("cells", []):
+                  source = cell.get("source", "")
+                  if isinstance(source, list):
+                      migrated = [migrate_source(str(part)) for part in source]
+                  else:
+                      migrated = migrate_source(str(source))
+                  if migrated != source:
+                      cell["source"] = migrated
+                      touched = True
+              if touched:
+                  path.write_text(
+                      json.dumps(notebook, ensure_ascii=False, indent=1) + "\n",
+                      encoding="utf-8",
+                  )
+                  changed.append(str(path))
+
+          print("Migrated notebooks:")
+          for path in changed:
+              print(" -", path)
+          if not changed:
+              print(" - none")
+          PY
+
+      - name: Commit migrated notebooks
+        run: |
+          if git diff --quiet -- projects/sh2026/workshop; then
+            echo "No notebook path changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add projects/sh2026/workshop/*.ipynb
+          git commit -m "refactor(sh2026): migrate workshop paths [notebook-migrated]"
+          git push origin HEAD:spatial-humanities-2026-cleanup-work
