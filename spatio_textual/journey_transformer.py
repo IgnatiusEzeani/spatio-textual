@@ -200,10 +200,116 @@ def spans_from_bio_predictions(
     return spans
 
 
-def _pick_role(spans: Sequence[dict[str, Any]], role: str, trigger: dict[str, Any], *, prefer_after: bool = False) -> dict[str, Any] | None:
+def spans_from_wordpiece_predictions(
+    text: str,
+    offsets: Sequence[Sequence[int]],
+    label_ids: Sequence[int],
+    word_ids: Sequence[int | None],
+) -> list[dict[str, Any]]:
+    """Collapse sub-token predictions without splitting one source word across roles.
+
+    Fast tokenizers may split a place such as ``Ibadan`` into multiple wordpieces.
+    A token classifier can occasionally give conflicting labels to those pieces.
+    We first reconcile all pieces belonging to the same original word, choosing
+    the majority non-O role and using the earliest predicted role as a stable
+    tie-breaker. BIO collapse is then performed at word level. This is generic
+    tokenizer post-processing, not a journey-specific gazetteer or holdout rule.
+    """
+    if not (len(offsets) == len(label_ids) == len(word_ids)):
+        raise ValueError("offsets, label_ids and word_ids must have equal length")
+
+    grouped: list[dict[str, Any]] = []
+    current_word: int | None = None
+    current_pieces: list[tuple[int, int, str]] = []
+
+    def flush_word() -> None:
+        nonlocal current_pieces
+        if not current_pieces:
+            return
+        role_order: list[str] = []
+        role_counts: Counter[str] = Counter()
+        for _start, _end, label in current_pieces:
+            if label == "O":
+                continue
+            _prefix, role = label.split("-", 1)
+            role_counts[role] += 1
+            if role not in role_order:
+                role_order.append(role)
+        if not role_counts:
+            chosen_label = "O"
+        else:
+            chosen_role = max(role_order, key=lambda role: (role_counts[role], -role_order.index(role)))
+            chosen_prefix = "B" if any(label == f"B-{chosen_role}" for _, _, label in current_pieces) else "I"
+            chosen_label = f"{chosen_prefix}-{chosen_role}"
+        grouped.append({
+            "start_char": min(start for start, _, _ in current_pieces),
+            "end_char": max(end for _, end, _ in current_pieces),
+            "label": chosen_label,
+        })
+        current_pieces = []
+
+    for (start, end), label_id, word_id in zip(offsets, label_ids, word_ids):
+        if word_id is None or start == end == 0:
+            continue
+        label = ID2LABEL.get(int(label_id), "O")
+        if current_word is None:
+            current_word = int(word_id)
+        elif int(word_id) != current_word:
+            flush_word()
+            current_word = int(word_id)
+        current_pieces.append((int(start), int(end), label))
+    flush_word()
+
+    spans: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for word in grouped:
+        label = str(word["label"])
+        if label == "O":
+            if current is not None:
+                current["text"] = text[current["start_char"]:current["end_char"]]
+                spans.append(current)
+                current = None
+            continue
+        prefix, role = label.split("-", 1)
+        start = int(word["start_char"])
+        end = int(word["end_char"])
+        if current is None or prefix == "B" or current["role"] != role:
+            if current is not None:
+                current["text"] = text[current["start_char"]:current["end_char"]]
+                spans.append(current)
+            current = {"role": role, "start_char": start, "end_char": end}
+        else:
+            current["end_char"] = end
+    if current is not None:
+        current["text"] = text[current["start_char"]:current["end_char"]]
+        spans.append(current)
+    return spans
+
+
+def _pick_role(
+    spans: Sequence[dict[str, Any]],
+    role: str,
+    trigger: dict[str, Any],
+    *,
+    current_start: int | None = None,
+    current_end: int | None = None,
+    allow_previous_context: bool = False,
+    prefer_after: bool = False,
+) -> dict[str, Any] | None:
     candidates = [span for span in spans if span.get("role") == role]
     if not candidates:
         return None
+
+    if current_start is not None and current_end is not None:
+        local = [
+            span for span in candidates
+            if int(span["start_char"]) >= current_start and int(span["end_char"]) <= current_end
+        ]
+        if local:
+            candidates = local
+        elif not allow_previous_context:
+            return None
+
     t = (int(trigger["start_char"]) + int(trigger["end_char"])) / 2.0
     if prefer_after:
         after = [span for span in candidates if int(span["start_char"]) >= int(trigger["end_char"])]
@@ -238,10 +344,13 @@ class TransformerJourneyExtractor:
             max_length=self.max_length,
             return_tensors="pt",
         )
+        word_ids = encoded.word_ids(batch_index=0)
         offsets = encoded.pop("offset_mapping")[0].tolist()
         with self.torch.no_grad():
             logits = self.model(**encoded).logits[0]
         label_ids = logits.argmax(dim=-1).tolist()
+        if word_ids is not None:
+            return spans_from_wordpiece_predictions(text, offsets, label_ids, word_ids)
         return spans_from_bio_predictions(text, offsets, label_ids)
 
     def extract(self, text: str, *, file_id: str = "document") -> dict[str, Any]:
@@ -263,11 +372,43 @@ class TransformerJourneyExtractor:
                 if span.get("role") == "TRIGGER" and int(span["start_char"]) >= current_start and int(span["end_char"]) <= current_end
             ]
             for trigger in triggers:
-                source_span = _pick_role(spans, "SOURCE", trigger)
-                destination_span = _pick_role(spans, "DESTINATION", trigger, prefer_after=True)
-                transport_span = _pick_role(spans, "TRANSPORT", trigger)
-                time_span = _pick_role(spans, "TIME", trigger)
-                reason_span = _pick_role(spans, "REASON", trigger)
+                source_span = _pick_role(
+                    spans,
+                    "SOURCE",
+                    trigger,
+                    current_start=current_start,
+                    current_end=current_end,
+                    allow_previous_context=True,
+                )
+                destination_span = _pick_role(
+                    spans,
+                    "DESTINATION",
+                    trigger,
+                    current_start=current_start,
+                    current_end=current_end,
+                    prefer_after=True,
+                )
+                transport_span = _pick_role(
+                    spans,
+                    "TRANSPORT",
+                    trigger,
+                    current_start=current_start,
+                    current_end=current_end,
+                )
+                time_span = _pick_role(
+                    spans,
+                    "TIME",
+                    trigger,
+                    current_start=current_start,
+                    current_end=current_end,
+                )
+                reason_span = _pick_role(
+                    spans,
+                    "REASON",
+                    trigger,
+                    current_start=current_start,
+                    current_end=current_end,
+                )
                 if source_span is None and destination_span is None:
                     continue
 
@@ -297,10 +438,7 @@ class TransformerJourneyExtractor:
                     "journey_reason": span_status(reason_span),
                 }
                 contextual = any(status == "contextual_inference" for status in statuses.values())
-                uses_previous = any(
-                    span is not None and int(span["start_char"]) < current_start
-                    for span in (source_span, destination_span, transport_span, time_span, reason_span)
-                )
+                uses_previous = source_span is not None and int(source_span["start_char"]) < current_start
                 evidence_start = window_start if uses_previous else sent.start_char
                 evidence_end = sent.end_char
                 evidence = source[evidence_start:evidence_end]
