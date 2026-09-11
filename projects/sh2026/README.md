@@ -24,11 +24,11 @@ projects/sh2026/
 ├── ROADMAP.md
 ├── benchmarks/        # frozen and development research corpora/builders
 ├── config/            # guarded experiment trigger/config files
+├── demo/              # conference-specific Streamlit experience
 ├── docs/              # protocols, result records and keynote evidence
 ├── scripts/           # SH2026 experiment runners and training scripts
-├── workshop/          # tutorial notebooks, data and instructor material
-└── demo/
-    └── streamlit_app.py   # conference-specific Streamlit experience
+├── tests/             # project-boundary and SH2026 regression tests
+└── workshop/          # tutorial notebooks, data and instructor material
 ```
 
 GitHub Actions workflow definitions remain under `.github/workflows/`, because GitHub requires workflows there, but SH2026 workflows reference resources under this project directory and are guarded so routine package changes do not repeat paid conference experiments.

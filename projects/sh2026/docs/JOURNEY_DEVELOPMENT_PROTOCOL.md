@@ -10,7 +10,7 @@ The development corpus is not evidence about historical testimony or CLDW distri
 
 ## Corpus v1
 
-Builder: `benchmarks/sh2026/build_journey_dev_v1.py`
+Builder: `projects/sh2026/benchmarks/build_journey_dev_v1.py`
 
 Expected SHA-256:
 

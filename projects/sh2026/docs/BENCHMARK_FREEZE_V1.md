@@ -8,17 +8,17 @@ The first SH2026 held-out benchmark has now been frozen as a deterministic, dist
 
 Generator:
 
-`benchmarks/sh2026/build_holdout_v1.py`
+`projects/sh2026/benchmarks/build_holdout_v1.py`
 
 Generated reference file:
 
-`benchmarks/sh2026/holdout_v1.jsonl`
+`projects/sh2026/benchmarks/holdout_v1.jsonl`
 
 Expected SHA-256:
 
 `be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b`
 
-The checksum is enforced by `tests/test_sh2026_holdout.py` and by the dedicated `SH2026 benchmark smoke` GitHub Actions workflow. Formal benchmark mode also refuses to run without an expected checksum and a recorded Git commit.
+The checksum is enforced by `projects/sh2026/tests/test_sh2026_holdout.py` and by the dedicated `SH2026 benchmark smoke` GitHub Actions workflow. Formal benchmark mode also refuses to run without an expected checksum and a recorded Git commit.
 
 ## Composition
 
@@ -37,7 +37,7 @@ The examples were deliberately stratified to stress different methodological lay
 
 ## Independence rule
 
-The existing `tutorials/sh2026/data/gold_reference_v0.1.jsonl` is a development/teaching set and has already influenced rules, prompts and notebook design. It is not part of the held-out benchmark.
+The existing `projects/sh2026/workshop/data/gold_reference_v0.1.jsonl` is a development/teaching set and has already influenced rules, prompts and notebook design. It is not part of the held-out benchmark.
 
 From this freeze onward:
 

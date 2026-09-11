@@ -1,2 +1,5 @@
 -e .[app]
+# Optional live SH2026 journey extraction uses the OpenAI adapter. The demo
+# remains fully usable without a key and never requests one from visitors.
+openai>=1.0.0
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

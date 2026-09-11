@@ -2,7 +2,7 @@
 
 Status: **frozen observed results for the Spatial NER row of the SH2026 comparative framework**
 
-These results complete the first task row in `docs/sh2026/EVALUATION_FRAMEWORK.md`: named-place recognition under a common TOPONYM ontology, followed by a separate broader spatial-span LLM condition.
+These results complete the first task row in `projects/sh2026/docs/EVALUATION_FRAMEWORK.md`: named-place recognition under a common TOPONYM ontology, followed by a separate broader spatial-span LLM condition.
 
 The results below are artifact-backed. They supersede any earlier provisional numbers quoted during development.
 

@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_OUTPUT = Path("benchmarks/sh2026/journey_dev_v1.jsonl")
+HERE = Path(__file__).resolve().parent
+DEFAULT_OUTPUT = HERE / "journey_dev_v1.jsonl"
 EXPECTED_SHA256 = "a5b89a40d0d0f7be1b3994852fa041c262ee56535d9ef400e50558d00666421b"
 
 LOCATIONS = [

@@ -14,6 +14,10 @@ from spatio_textual.gold import load_gold_jsonl
 from spatio_textual.rules import RuleGazetteerAnnotator
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_GAZETTEER = PROJECT_ROOT / "workshop" / "data" / "teaching_gazetteer.csv"
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
@@ -26,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--gazetteer",
         type=Path,
-        default=Path("tutorials/sh2026/data/teaching_gazetteer.csv"),
+        default=DEFAULT_GAZETTEER,
     )
     p.add_argument("--benchmark-mode", action="store_true")
     p.add_argument("--frozen-at-commit", default=None)

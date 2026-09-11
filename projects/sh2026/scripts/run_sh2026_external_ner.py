@@ -17,6 +17,8 @@ from spatio_textual.utils import Annotator, load_spacy_model
 
 DEFAULT_HF_MODEL = "dslim/bert-base-NER"
 DEFAULT_HF_REVISION = "0b95561fd0c304538b5eb8a0ee532ca24dd009b9"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_GAZETTEER = PROJECT_ROOT / "workshop" / "data" / "teaching_gazetteer.csv"
 
 
 def _args() -> argparse.Namespace:
@@ -24,7 +26,7 @@ def _args() -> argparse.Namespace:
     p.add_argument("input", type=Path)
     p.add_argument("--out-dir", type=Path, default=Path("sh2026_outputs/cldw_external_v1"))
     p.add_argument("--methods", default="rules,spacy,spacy_resources,hf")
-    p.add_argument("--gazetteer", type=Path, default=Path("tutorials/sh2026/data/teaching_gazetteer.csv"))
+    p.add_argument("--gazetteer", type=Path, default=DEFAULT_GAZETTEER)
     p.add_argument("--spacy-model", default="en_core_web_sm")
     p.add_argument("--hf-model", default=DEFAULT_HF_MODEL)
     p.add_argument("--hf-revision", default=DEFAULT_HF_REVISION)
@@ -85,8 +87,6 @@ def _row(
         "cost_usd_est": tel.get("cost_usd_est_total"),
         "source_path": (record.get("source") or {}).get("path"),
         "paragraph_ordinal": (record.get("source") or {}).get("paragraph_ordinal"),
-        # Keep the evidence needed to audit boundary and ontology disagreements.
-        # These are intentionally present in JSONL but omitted from the flat CSV.
         "reference_spans": reference,
         "predicted_spans": predicted,
     }
@@ -215,7 +215,6 @@ def main() -> None:
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # Keep CSV compact and tabular; full auditable spans remain in JSONL.
     csv_rows = [
         {k: v for k, v in row.items() if k not in {"reference_spans", "predicted_spans"}}
         for row in rows

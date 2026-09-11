@@ -4,7 +4,7 @@ Status: **protocol frozen; synthetic holdout and CLDW external-validation layers
 
 Purpose: generate defensible empirical evidence for the workshop, hosted demo and keynote without turning the comparison into a simplistic model leaderboard.
 
-The overarching task-by-method design is defined in `docs/sh2026/EVALUATION_FRAMEWORK.md`.
+The overarching task-by-method design is defined in `projects/sh2026/docs/EVALUATION_FRAMEWORK.md`.
 
 ## 1. Research questions
 
@@ -55,11 +55,11 @@ Record exact backend/model/version at runtime. Do not use labels such as simply 
 
 ### Teaching/development set
 
-`tutorials/sh2026/data/gold_reference_v0.1.jsonl` is a **development/teaching reference**. It has already influenced rules, examples, notebook design and validation utilities. It must therefore **not be reported as an unbiased final benchmark**.
+`projects/sh2026/workshop/data/gold_reference_v0.1.jsonl` is a **development/teaching reference**. It has already influenced rules, examples, notebook design and validation utilities. It must therefore **not be reported as an unbiased final benchmark**.
 
 ### Frozen synthetic holdout
 
-`benchmarks/sh2026/holdout_v1.jsonl` is the frozen synthetic SH2026 holdout. Its deterministic generation and SHA-256 are documented in `benchmarks/sh2026/README.md` and enforced by CI.
+`projects/sh2026/benchmarks/holdout_v1.jsonl` is the frozen synthetic SH2026 holdout. Its deterministic generation and SHA-256 are documented in `projects/sh2026/benchmarks/README.md` and enforced by CI.
 
 The set was frozen before the remaining LLM comparison conditions. Do not inspect formal holdout errors and tune the tested system while continuing to describe the same set as held out.
 
@@ -77,7 +77,7 @@ Controlled-access Holocaust testimony transcripts must **not** be copied into th
 
 ## 5. Annotation and adjudication
 
-Each reference example follows `docs/sh2026/GOLD_ANNOTATION_GUIDE.md`.
+Each reference example follows `projects/sh2026/docs/GOLD_ANNOTATION_GUIDE.md`.
 
 Minimum process:
 
@@ -216,7 +216,7 @@ If only one API run is feasible for the conference sprint, state that limitation
 
 ## 10. Benchmark output
 
-Write tidy per-example rows compatible with `docs/sh2026/COMMON_SCHEMA.md` and the benchmark utilities.
+Write tidy per-example rows compatible with `projects/sh2026/docs/COMMON_SCHEMA.md` and the benchmark utilities.
 
 Core cross-task columns should include where meaningful:
 

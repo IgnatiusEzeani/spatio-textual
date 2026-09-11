@@ -80,7 +80,7 @@ If a model returns an unmentioned place, malformed evidence or an occurrence tha
 
 ### Frozen synthetic holdout
 
-Primary controlled comparison uses `benchmarks/sh2026/holdout_v1.jsonl`, generated deterministically with SHA-256:
+Primary controlled comparison uses `projects/sh2026/benchmarks/holdout_v1.jsonl`, generated deterministically with SHA-256:
 
 `be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b`
 
@@ -130,13 +130,13 @@ For Condition B also report representational reach separately from within-label 
 
 The experiment runner is:
 
-`python scripts/run_sh2026_llm_ner.py ...`
+`python projects/sh2026/scripts/run_sh2026_llm_ner.py ...`
 
 For the formal synthetic TOPONYM condition:
 
 ```bash
-python benchmarks/sh2026/build_holdout_v1.py
-python scripts/run_sh2026_llm_ner.py benchmarks/sh2026/holdout_v1.jsonl \
+python projects/sh2026/benchmarks/build_holdout_v1.py
+python projects/sh2026/scripts/run_sh2026_llm_ner.py projects/sh2026/benchmarks/holdout_v1.jsonl \
   --condition toponym \
   --provider openai \
   --model gpt-5.6-sol \
@@ -153,7 +153,7 @@ After inference, `llm_ner_predictions.jsonl` can be re-scored with `--prediction
 
 ### Draft-PR execution control
 
-GitHub only exposes `workflow_dispatch` after the workflow exists on the repository's default branch. While SH2026 remains on its draft feature branch, `.github/workflows/sh2026-llm-ner.yml` therefore also supports a deliberately narrow pull-request trigger: changing `.github/sh2026_llm_ner_scope` runs exactly the requested formal condition. Unrelated commits do not trigger paid inference.
+GitHub only exposes `workflow_dispatch` after the workflow exists on the repository's default branch. While SH2026 remains on its draft feature branch, `.github/workflows/sh2026-llm-ner.yml` therefore also supports a deliberately narrow pull-request trigger: changing `projects/sh2026/config/llm_ner_scope` runs exactly the requested formal condition. Unrelated commits do not trigger paid inference.
 
 The repository secret `OPENAI_API_KEY` is a hard precondition. If it is absent, the workflow stops before building datasets or making an API call. Secrets must never be committed, echoed into logs, or passed as command-line arguments.
 

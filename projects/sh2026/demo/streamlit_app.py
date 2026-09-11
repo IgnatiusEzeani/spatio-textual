@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import os
 import subprocess
@@ -12,7 +13,7 @@ import streamlit as st
 from spatio_textual.benchmark import summarize_telemetry
 from spatio_textual.emotion import EmotionAnalyzer
 from spatio_textual.evaluation import harmonize_ner_entities
-from spatio_textual.journeys import JourneyExtractor
+from spatio_textual.journeys import JOURNEY_FIELDS, JourneyExtractor, normalise_model_journey
 from spatio_textual.llm import LLMClient
 from spatio_textual.provenance import build_run_manifest
 from spatio_textual.review import apply_human_review
@@ -27,6 +28,8 @@ REPO_ROOT = PROJECT_ROOT.parents[1]
 WORKSHOP_DATA = PROJECT_ROOT / "workshop" / "data"
 EXAMPLES_PATH = WORKSHOP_DATA / "examples.json"
 TEACHING_GAZETTEER = WORKSHOP_DATA / "teaching_gazetteer.csv"
+BENCHMARK_SNAPSHOT_PATH = PROJECT_ROOT / "benchmarks" / "results_snapshot_v1.json"
+FALLBACK_JOURNEYS_PATH = DEMO_DIR / "fallback_journeys_v1.json"
 PACKAGE_RESOURCES = REPO_ROOT / "spatio_textual" / "resources"
 
 st.set_page_config(
@@ -42,6 +45,20 @@ def load_examples() -> list[dict[str, Any]]:
     if not EXAMPLES_PATH.exists():
         return []
     return json.loads(EXAMPLES_PATH.read_text(encoding="utf-8"))
+
+
+@st.cache_data
+def load_benchmark_snapshot() -> dict[str, Any]:
+    if not BENCHMARK_SNAPSHOT_PATH.exists():
+        return {"rows": [], "omissions": []}
+    return json.loads(BENCHMARK_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+
+
+@st.cache_data
+def load_fallback_journeys() -> dict[str, Any]:
+    if not FALLBACK_JOURNEYS_PATH.exists():
+        return {"examples": {}}
+    return json.loads(FALLBACK_JOURNEYS_PATH.read_text(encoding="utf-8"))
 
 
 @st.cache_resource
@@ -76,12 +93,15 @@ def entity_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "segment": record.get("segId", 1),
                 "text": entity.get("text"),
                 "label": entity.get("label"),
+                "start_char": entity.get("start_char"),
+                "end_char": entity.get("end_char"),
                 "resolved_name": entity.get("resolved_name"),
                 "resolution_status": entity.get("resolution_status"),
                 "ambiguous": entity.get("ambiguous"),
                 "lat": entity.get("lat"),
                 "lon": entity.get("lon"),
                 "source": entity.get("source"),
+                "human_status": entity.get("human_status", "unreviewed"),
             })
     return rows
 
@@ -132,8 +152,154 @@ def analyse(text: str, *, link_places: bool = True) -> dict[str, Any]:
 def maybe_extract_journeys(text: str) -> dict[str, Any] | None:
     if not os.getenv("OPENAI_API_KEY"):
         return None
-    client = LLMClient(provider="openai", model="gpt-5.6-sol")
-    return JourneyExtractor(client=client).extract(text, file_id="demo", seg_id=1)
+    client = LLMClient(provider="openai")
+    result = JourneyExtractor(client=client).extract(text, file_id="demo", seg_id=1)
+    result["demo_source"] = "live_llm"
+    return result
+
+
+def fallback_journey_result(example_id: str | None, source_text: str) -> dict[str, Any] | None:
+    if not example_id:
+        return None
+    raw_rows = (load_fallback_journeys().get("examples") or {}).get(example_id)
+    if not raw_rows:
+        return None
+    journeys = [
+        normalise_model_journey(
+            raw,
+            source_text=source_text,
+            file_id=f"demo:{example_id}",
+            seg_id=1,
+            model="instructor_curated_v1",
+            provider="sh2026",
+        )
+        for raw in raw_rows
+    ]
+    return {
+        "journeys": journeys,
+        "review_notes": [],
+        "demo_source": "curated_teaching_fallback",
+    }
+
+
+def _valid_spans(text: str, spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    valid: list[dict[str, Any]] = []
+    for span in spans:
+        start = span.get("start_char")
+        end = span.get("end_char")
+        if not isinstance(start, int) or not isinstance(end, int):
+            continue
+        if start < 0 or end <= start or end > len(text):
+            continue
+        valid.append(span)
+    return sorted(valid, key=lambda row: (row["start_char"], -(row["end_char"] - row["start_char"])))
+
+
+def highlighted_source_html(text: str, spans: list[dict[str, Any]]) -> str:
+    """Render source text with non-overlapping evidence spans highlighted.
+
+    Overlapping predictions remain visible in the tables; the text view chooses
+    the earliest/longest span only to avoid malformed nested HTML.
+    """
+    parts: list[str] = []
+    cursor = 0
+    for span in _valid_spans(text, spans):
+        start = span["start_char"]
+        end = span["end_char"]
+        if start < cursor:
+            continue
+        parts.append(html.escape(text[cursor:start]))
+        label = html.escape(str(span.get("label") or "SPAN"))
+        snippet = html.escape(text[start:end])
+        parts.append(
+            f'<mark title="{label}" style="padding:0.08rem 0.18rem;border-radius:0.2rem;">'
+            f'{snippet}<sup style="font-size:0.65em;margin-left:0.2rem;">{label}</sup></mark>'
+        )
+        cursor = end
+    parts.append(html.escape(text[cursor:]))
+    return '<div style="line-height:1.9;white-space:pre-wrap;">' + "".join(parts) + "</div>"
+
+
+def render_highlighted_source(text: str, spans: list[dict[str, Any]], *, caption: str | None = None) -> None:
+    if caption:
+        st.caption(caption)
+    if not spans:
+        st.code(text, language=None)
+        return
+    st.markdown(highlighted_source_html(text, spans), unsafe_allow_html=True)
+
+
+def _distribution_frame(distribution: dict[str, Any] | None) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for label, value in (distribution or {}).items():
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            continue
+        rows.append({"label": str(label), "score": score})
+    if not rows:
+        return pd.DataFrame(columns=["score"])
+    return pd.DataFrame(rows).sort_values("score", ascending=False).set_index("label")
+
+
+def render_affect(rec: dict[str, Any]) -> None:
+    sentiment = _distribution_frame(rec.get("sentiment_distribution"))
+    emotion = _distribution_frame(rec.get("emotion_dist"))
+    left, right = st.columns(2)
+    with left:
+        st.markdown("#### Sentiment signal")
+        st.metric("Top label", rec.get("sentiment_label") or "n/a")
+        if sentiment.empty:
+            st.caption("No sentiment distribution available.")
+        else:
+            st.bar_chart(sentiment)
+    with right:
+        st.markdown("#### Emotion signal")
+        st.metric("Top label", rec.get("emotion_label") or "n/a")
+        if emotion.empty:
+            st.caption("No emotion distribution available.")
+        else:
+            st.bar_chart(emotion)
+    st.caption("These labels are analytical model signals, not claims about a narrator's psychological state.")
+
+
+def render_journey_cards(journeys: list[dict[str, Any]], *, source: str | None = None) -> None:
+    if not journeys:
+        st.caption("No structured journeys are available for this passage.")
+        return
+    if source == "curated_teaching_fallback":
+        st.info(
+            "Offline-safe teaching fallback: these structured records were curated by the instructor to demonstrate the schema and audit workflow. "
+            "They are not LLM predictions and are not benchmark results."
+        )
+    elif source == "live_llm":
+        st.caption("Live structured extraction. Evidence quotations are grounded and character offsets are computed locally.")
+
+    for index, journey in enumerate(journeys, start=1):
+        with st.container(border=True):
+            start = journey.get("start_location") or "origin not stated"
+            end = journey.get("end_location") or "destination not stated"
+            st.markdown(f"#### Journey {index}: {start} → {end}")
+            quote = journey.get("evidence_quote")
+            if quote:
+                st.markdown("**Source evidence**")
+                st.code(quote, language=None)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Evidence grounded", "Yes" if journey.get("evidence_grounded") else "No")
+            m2.metric("Human review", "Required" if journey.get("requires_review") else "Not flagged")
+            confidence = journey.get("confidence")
+            m3.metric("Confidence", f"{confidence:.2f}" if isinstance(confidence, (int, float)) else "not supplied")
+            statuses = journey.get("explicit_or_inferred") or {}
+            fields = []
+            for field in JOURNEY_FIELDS:
+                fields.append({
+                    "Field": field,
+                    "Value": journey.get(field),
+                    "Provenance": statuses.get(field, "missing"),
+                })
+            st.dataframe(pd.DataFrame(fields), use_container_width=True, hide_index=True)
+            if journey.get("review_notes"):
+                st.warning("; ".join(map(str, journey.get("review_notes") or [])))
 
 
 def render_map(records: list[dict[str, Any]], journeys: list[dict[str, Any]]) -> None:
@@ -177,24 +343,52 @@ def render_map(records: list[dict[str, Any]], journeys: list[dict[str, Any]]) ->
         st.dataframe(pd.DataFrame(route_geo["audit"]), use_container_width=True, hide_index=True)
 
 
+def _results_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    return frame[["task", "method", "precision", "recall", "f1"]].rename(
+        columns={
+            "task": "Task",
+            "method": "Method",
+            "precision": "Precision",
+            "recall": "Recall",
+            "f1": "F1",
+        }
+    )
+
+
 def benchmark_snapshot() -> None:
     st.markdown("### Frozen SH2026 benchmark snapshot")
-    st.caption("These are project-specific empirical results, not package performance guarantees.")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Task": "TOPONYM", "Method": "Rules", "Precision": 1.000, "Recall": 0.073, "F1": 0.136},
-                {"Task": "TOPONYM", "Method": "spaCy", "Precision": 0.962, "Recall": 0.610, "F1": 0.746},
-                {"Task": "TOPONYM", "Method": "HF BERT", "Precision": 0.952, "Recall": 0.976, "F1": 0.964},
-                {"Task": "TOPONYM", "Method": "GPT-5.6 Sol", "Precision": 0.976, "Recall": 1.000, "F1": 0.988},
-                {"Task": "Journey", "Method": "Rules", "Precision": 0.944, "Recall": 0.944, "F1": 0.944},
-                {"Task": "Journey", "Method": "Transformer", "Precision": 0.882, "Recall": 0.833, "F1": 0.857},
-                {"Task": "Journey", "Method": "GPT-5.6 Sol", "Precision": 0.750, "Recall": 1.000, "F1": 0.857},
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True,
+    st.caption(
+        "Only artifact-backed, reportable rows are shown. Synthetic controlled results and source-derived CLDW validation are kept separate."
     )
+    snapshot = load_benchmark_snapshot()
+    rows = [row for row in snapshot.get("rows", []) if row.get("status") == "reportable"]
+    synthetic = [row for row in rows if row.get("dataset") == "Synthetic holdout v1"]
+    external = [row for row in rows if row.get("dataset") == "CLDW external validation"]
+
+    if synthetic:
+        st.markdown("#### Synthetic controlled holdout")
+        st.dataframe(_results_frame(synthetic), use_container_width=True, hide_index=True)
+    else:
+        st.warning("No reportable synthetic benchmark rows are available in the release snapshot.")
+
+    if external:
+        with st.expander("Source-derived CLDW TOPONYM validation"):
+            st.dataframe(_results_frame(external), use_container_width=True, hide_index=True)
+            st.caption(
+                "The CLDW check uses a small purposively selected source-derived sample; it is not a population-level estimate for the corpus."
+            )
+
+    omissions = snapshot.get("omissions", [])
+    for omission in omissions:
+        if omission.get("status") == "not_reportable":
+            st.warning(
+                f"{omission.get('task')} / {omission.get('method')} is not shown as a scored result: "
+                f"{omission.get('reason')}"
+            )
+
     st.info(
         "Read the table as a trade-off, not a leaderboard: representational reach, evidence, inference and review burden change with the method."
     )
@@ -206,6 +400,8 @@ if "journeys" not in st.session_state:
     st.session_state.journeys = []
 if "journey_notes" not in st.session_state:
     st.session_state.journey_notes = []
+if "journey_source" not in st.session_state:
+    st.session_state.journey_source = None
 
 examples = load_examples()
 
@@ -227,6 +423,16 @@ if page == "Home":
     a.metric("Recognition", "Spatial entities")
     b.metric("Reconstruction", "Journeys")
     c.metric("Interpretation", "Affect")
+
+    st.markdown("### Public-safe examples")
+    example_columns = st.columns(min(3, max(1, len(examples))))
+    for index, example in enumerate(examples[:3]):
+        with example_columns[index]:
+            with st.container(border=True):
+                st.markdown(f"**{example.get('title')}**")
+                st.caption(example.get("genre") or "narrative")
+                st.write(", ".join(example.get("teaching_targets") or []))
+
     benchmark_snapshot()
     st.markdown("### Methodological progression")
     st.markdown("**Rules / resources → contextual transformers → structured LLMs → human adjudication**")
@@ -235,29 +441,69 @@ elif page == "Analyse":
     st.subheader("Analyse a public-safe example")
     titles = [example["title"] for example in examples]
     chosen = st.selectbox("Example", titles) if titles else None
-    default_text = examples[titles.index(chosen)]["text"] if chosen else ""
+    selected_example = examples[titles.index(chosen)] if chosen else None
+    default_text = selected_example["text"] if selected_example else ""
+    if selected_example and selected_example.get("source_note"):
+        st.caption(selected_example["source_note"])
     text = st.text_area("Source text", value=default_text, height=220)
     link_places = st.checkbox("Resolve named places where possible", value=True)
-    run_llm = st.checkbox("Also run live evidence-first LLM journey extraction", value=False)
-    if run_llm and not os.getenv("OPENAI_API_KEY"):
-        st.warning("No server-side OpenAI key is configured. The core demonstration remains fully usable without a live LLM call.")
+    journey_mode = st.selectbox(
+        "Structured journey layer",
+        [
+            "Off",
+            "Automatic: live if configured, otherwise teaching fallback",
+            "Teaching fallback: offline-safe",
+            "Live LLM: server-configured",
+        ],
+    )
+    if journey_mode != "Off" and not os.getenv("OPENAI_API_KEY"):
+        st.caption(
+            "No live provider key is configured on the server. Supported unchanged teaching examples can still use the curated offline fallback."
+        )
 
     if st.button("Run analysis", type="primary", use_container_width=True):
         if not text.strip():
             st.error("Enter source text first.")
         else:
             result = analyse(text, link_places=link_places)
-            st.session_state.analysis = {"text": text, **result}
+            example_id = selected_example.get("id") if selected_example else None
+            st.session_state.analysis = {"text": text, "example_id": example_id, **result}
             st.session_state.journeys = []
             st.session_state.journey_notes = []
-            if run_llm and os.getenv("OPENAI_API_KEY"):
-                try:
-                    journey_result = maybe_extract_journeys(text)
-                    if journey_result:
-                        st.session_state.journeys = journey_result.get("journeys") or []
-                        st.session_state.journey_notes = journey_result.get("review_notes") or []
-                except Exception as exc:
-                    st.session_state.journey_notes = [f"Live journey extraction failed: {exc}"]
+            st.session_state.journey_source = None
+
+            journey_result: dict[str, Any] | None = None
+            exact_teaching_example = bool(selected_example and text == selected_example.get("text"))
+            wants_live = journey_mode in {
+                "Automatic: live if configured, otherwise teaching fallback",
+                "Live LLM: server-configured",
+            }
+            wants_fallback = journey_mode in {
+                "Automatic: live if configured, otherwise teaching fallback",
+                "Teaching fallback: offline-safe",
+            }
+
+            if journey_mode != "Off":
+                if wants_live and os.getenv("OPENAI_API_KEY"):
+                    try:
+                        journey_result = maybe_extract_journeys(text)
+                    except Exception as exc:
+                        st.session_state.journey_notes = [f"Live journey extraction failed: {exc}"]
+                if journey_result is None and wants_fallback and exact_teaching_example:
+                    journey_result = fallback_journey_result(example_id, text)
+                if journey_result is None and journey_mode != "Live LLM: server-configured":
+                    st.session_state.journey_notes.append(
+                        "No curated journey fallback exists for this exact passage. The rest of the analysis remains available."
+                    )
+                elif journey_result is None and not os.getenv("OPENAI_API_KEY"):
+                    st.session_state.journey_notes.append(
+                        "Live LLM extraction is unavailable because the server has no provider key configured."
+                    )
+
+            if journey_result:
+                st.session_state.journeys = journey_result.get("journeys") or []
+                st.session_state.journey_notes.extend(journey_result.get("review_notes") or [])
+                st.session_state.journey_source = journey_result.get("demo_source")
 
     analysis = st.session_state.analysis
     if analysis:
@@ -267,18 +513,20 @@ elif page == "Analyse":
         m1.metric("Contextual entities", len(entities))
         m2.metric("Rule spans", len(analysis["rules"].get("spans") or []))
         m3.metric("Journeys", len(st.session_state.journeys))
-        st.markdown("### Contextual NLP output")
+
+        st.markdown("### Source with contextual annotations")
+        render_highlighted_source(
+            analysis["text"],
+            records[0].get("entities") or [],
+            caption="Highlights show grounded character spans; overlapping alternatives remain available in the table below.",
+        )
         st.dataframe(pd.DataFrame(entities), use_container_width=True, hide_index=True)
+
         st.markdown("### Affect signals")
-        rec = records[0]
-        c1, c2 = st.columns(2)
-        c1.write("**Sentiment**")
-        c1.json(rec.get("sentiment_distribution") or {})
-        c2.write("**Emotion**")
-        c2.json(rec.get("emotion_dist") or {})
-        if st.session_state.journeys:
-            st.markdown("### Evidence-first structured journeys")
-            st.dataframe(pd.DataFrame(st.session_state.journeys), use_container_width=True, hide_index=True)
+        render_affect(records[0])
+
+        st.markdown("### Evidence-first structured journeys")
+        render_journey_cards(st.session_state.journeys, source=st.session_state.journey_source)
         if st.session_state.journey_notes:
             st.warning("; ".join(map(str, st.session_state.journey_notes)))
 
@@ -289,26 +537,26 @@ elif page == "Compare":
         st.info("Run an analysis first.")
     else:
         source = analysis["text"]
-        rules = analysis["rules"].get("spans") or []
-        contextual = harmonize_ner_entities(analysis["records"][0].get("entities") or [])
+        rule_spans = analysis["rules"].get("spans") or []
+        contextual_raw = analysis["records"][0].get("entities") or []
+        contextual = harmonize_ner_entities(contextual_raw)
         left, right = st.columns(2)
         with left:
             st.markdown("#### Rules / gazetteer")
-            st.dataframe(pd.DataFrame(rules), use_container_width=True, hide_index=True)
+            render_highlighted_source(source, rule_spans)
+            st.dataframe(pd.DataFrame(rule_spans), use_container_width=True, hide_index=True)
             st.caption("Transparent and deterministic, but bounded by encoded resources and patterns.")
         with right:
             st.markdown("#### Contextual NER")
+            render_highlighted_source(source, contextual_raw)
             st.dataframe(pd.DataFrame(contextual), use_container_width=True, hide_index=True)
             st.caption("Context-sensitive recognition, but still bounded by its entity ontology.")
-        st.markdown("#### Richer structured layer")
-        if st.session_state.journeys:
-            st.dataframe(pd.DataFrame(st.session_state.journeys), use_container_width=True, hide_index=True)
-        else:
-            st.caption("Live structured journey extraction has not been run for this passage.")
+
+        st.markdown("### Richer structured layer")
+        render_journey_cards(st.session_state.journeys, source=st.session_state.journey_source)
         st.info(
             "Better recognition within a narrow ontology is not the same as richer spatial understanding. Richer representation also increases the audit burden."
         )
-        st.code(source, language=None)
 
 elif page == "Explore":
     st.subheader("Explore spatial representations")
@@ -325,6 +573,7 @@ elif page == "Explore":
             st.dataframe(pd.DataFrame(edges, columns=["source", "target", "weight"]), use_container_width=True, hide_index=True)
         else:
             st.caption("No co-occurrence edges in the current one-segment example.")
+        st.caption("Unresolved or relational spatial evidence should remain textual rather than being forced onto a coordinate map.")
 
 elif page == "Review":
     st.subheader("Human review remains part of the method")
@@ -344,15 +593,36 @@ elif page == "Review":
         for index, entity in flagged:
             with st.container(border=True):
                 st.write({k: entity.get(k) for k in ("text", "resolved_name", "resolution_status", "ambiguous", "candidates")})
-                decision = st.selectbox("Decision", ["accept", "reject"], key=f"place_decision_{index}")
+                decision = st.selectbox("Decision", ["accept", "edit", "reject"], key=f"place_decision_{index}")
+                replacement = None
+                if decision == "edit":
+                    replacement = st.text_input(
+                        "Corrected/resolved place name",
+                        value=str(entity.get("resolved_name") or entity.get("text") or ""),
+                        key=f"place_edit_{index}",
+                    )
                 if st.button("Record review", key=f"place_review_{index}"):
-                    records[0]["entities"][index] = apply_human_review(entity, action=decision, reason="conference_demo_review")
+                    if entity.get("ambiguous"):
+                        reason = "ambiguous_place"
+                    elif entity.get("resolution_status") == "unresolved":
+                        reason = "unresolved_place"
+                    else:
+                        reason = "human_flag"
+                    kwargs: dict[str, Any] = {}
+                    if decision == "edit":
+                        kwargs = {"field": "resolved_name", "new_value": replacement}
+                    records[0]["entities"][index] = apply_human_review(
+                        entity,
+                        action=decision,
+                        reason=reason,
+                        **kwargs,
+                    )
                     st.session_state.analysis["records"] = records
-                    st.success("Review appended to the audit trail.")
+                    st.success("Review appended to the audit trail; the original machine value remains in the edit event.")
 
         st.markdown("### Journey review")
         if not st.session_state.journeys:
-            st.caption("No live journey records to review.")
+            st.caption("No structured journey records to review.")
         for index, journey in enumerate(st.session_state.journeys):
             if not journey.get("requires_review"):
                 continue
@@ -360,6 +630,33 @@ elif page == "Review":
                 st.write(f"{journey.get('start_location') or '∅'} → {journey.get('end_location') or '∅'}")
                 st.caption(journey.get("evidence_quote") or "No grounded evidence")
                 st.write("Field provenance:", journey.get("explicit_or_inferred"))
+                decision = st.selectbox("Journey decision", ["accept", "edit", "reject"], key=f"journey_decision_{index}")
+                edit_field = None
+                edit_value = None
+                if decision == "edit":
+                    edit_field = st.selectbox("Field to edit", list(JOURNEY_FIELDS), key=f"journey_field_{index}")
+                    edit_value = st.text_input(
+                        "Corrected value (leave blank to mark missing)",
+                        value=str(journey.get(edit_field) or ""),
+                        key=f"journey_value_{index}",
+                    )
+                if st.button("Record journey review", key=f"journey_review_{index}"):
+                    inferred = any(
+                        status == "contextual_inference"
+                        for status in (journey.get("explicit_or_inferred") or {}).values()
+                    )
+                    reason = "contextual_inference" if inferred else "human_flag"
+                    kwargs = {}
+                    if decision == "edit" and edit_field:
+                        new_value = edit_value if edit_value not in (None, "") else None
+                        kwargs = {"field": edit_field, "new_value": new_value}
+                    reviewed = apply_human_review(journey, action=decision, reason=reason, **kwargs)
+                    if decision == "edit" and edit_field:
+                        statuses = dict(reviewed.get("explicit_or_inferred") or {})
+                        statuses[edit_field] = "human_supplied" if reviewed.get(edit_field) not in (None, "") else "missing"
+                        reviewed["explicit_or_inferred"] = statuses
+                    st.session_state.journeys[index] = reviewed
+                    st.success("Journey review appended to the audit trail.")
 
 elif page == "About":
     st.subheader("About the SH2026 demonstrator")
@@ -369,11 +666,20 @@ elif page == "About":
         "The demo is a project-specific presentation layer over the reusable `spatio-textual` package. "
         "It uses public-safe or synthetic material and does not bundle controlled-access testimony transcripts."
     )
+    st.markdown("### Reliability modes")
+    st.write(
+        "The core entity, affect, comparison and review paths run locally. Optional live journey extraction uses a server-side provider configuration; "
+        "supported teaching examples have an explicitly labelled instructor-curated fallback so the demonstration does not depend on an API call."
+    )
     st.markdown("### Provenance")
     records = (st.session_state.analysis or {}).get("records", []) if st.session_state.analysis else []
     manifest = build_run_manifest(
         input_text=(st.session_state.analysis or {}).get("text", "") if st.session_state.analysis else "",
-        config={"demo": "SH2026", "live_llm_available": bool(os.getenv("OPENAI_API_KEY"))},
+        config={
+            "demo": "SH2026",
+            "live_llm_available": bool(os.getenv("OPENAI_API_KEY")),
+            "journey_source": st.session_state.journey_source,
+        },
         git_commit=git_commit(),
     )
     st.json({
@@ -381,4 +687,6 @@ elif page == "About":
         "telemetry_summary": summarize_telemetry(telemetry_rows(records)) if records else {},
         "common_schema": "projects/sh2026/docs/COMMON_SCHEMA.md",
         "benchmark_protocol": "projects/sh2026/docs/BENCHMARK_PROTOCOL.md",
+        "benchmark_snapshot": "projects/sh2026/benchmarks/results_snapshot_v1.json",
+        "teaching_fallback": "projects/sh2026/demo/fallback_journeys_v1.json",
     })

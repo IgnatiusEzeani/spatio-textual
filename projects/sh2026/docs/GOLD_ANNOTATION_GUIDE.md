@@ -6,7 +6,7 @@ Schema version: `sh2026-gold-0.1`
 
 This guide defines the human reference annotations used in the Spatial Humanities 2026 workshop, demo and comparative experiments. The purpose is not to manufacture an interpretation-free `ground truth`. It is to make the human decisions against which computational methods are compared **explicit, inspectable and reproducible**.
 
-The common audit/export vocabulary remains defined in `docs/sh2026/COMMON_SCHEMA.md`. This document specifies how a small human reference set is created before model evaluation.
+The common audit/export vocabulary remains defined in `projects/sh2026/docs/COMMON_SCHEMA.md`. This document specifies how a small human reference set is created before model evaluation.
 
 ## 1. Why a human reference set is needed
 
@@ -50,7 +50,7 @@ Each JSONL line is one document/example:
     "source_note": "...",
     "distribution_status": "safe_to_distribute"
   },
-  "annotation_policy": "docs/sh2026/GOLD_ANNOTATION_GUIDE.md",
+  "annotation_policy": "projects/sh2026/docs/GOLD_ANNOTATION_GUIDE.md",
   "reference_status": "adjudicated_reference",
   "spans": [],
   "relations": [],
@@ -236,7 +236,7 @@ This list may grow, but additions should be documented rather than introduced si
 
 ## 8. Journey annotation
 
-Journey records follow `docs/sh2026/COMMON_SCHEMA.md`.
+Journey records follow `projects/sh2026/docs/COMMON_SCHEMA.md`.
 
 A human reference journey must include:
 

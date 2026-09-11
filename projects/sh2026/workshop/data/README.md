@@ -18,7 +18,7 @@ Current categories:
 
 ### `gold_reference_v0.1.jsonl`
 
-Human reference annotations following `docs/sh2026/GOLD_ANNOTATION_GUIDE.md`.
+Human reference annotations following `projects/sh2026/docs/GOLD_ANNOTATION_GUIDE.md`.
 
 Each JSONL line contains:
 
@@ -66,7 +66,7 @@ The package provides lightweight validation/scoring helpers in:
 
 `spatio_textual.gold`
 
-The CI test `tests/test_gold.py` verifies, among other things:
+The CI test `projects/sh2026/tests/test_gold_reference.py` verifies, among other things:
 
 - source-offset integrity;
 - evidence quotation integrity;
@@ -90,4 +90,4 @@ For the final keynote experiment, create a second independently annotated set an
 
 Current reference schema: `sh2026-gold-0.1`
 
-If annotation policy changes in a way that affects labels, boundaries, relation semantics or journey-field interpretation, update the version and document the change in `docs/sh2026/GOLD_ANNOTATION_GUIDE.md`.
+If annotation policy changes in a way that affects labels, boundaries, relation semantics or journey-field interpretation, update the version and document the change in `projects/sh2026/docs/GOLD_ANNOTATION_GUIDE.md`.

@@ -62,17 +62,38 @@ jobs:
       - name: Verify pinned Hugging Face revisions resolve exactly
         run: |
           python - <<'PY'
-          from huggingface_hub import model_info
           import os
+          import time
+          from huggingface_hub import model_info
+
           for model_env, revision_env in [
               ('SENTIMENT_MODEL', 'SENTIMENT_REVISION'),
               ('EMOTION_MODEL', 'EMOTION_REVISION'),
           ]:
               model = os.environ[model_env]
               revision = os.environ[revision_env]
-              info = model_info(model, revision=revision)
-              assert info.sha == revision, (model, info.sha, revision)
-              print(model, info.sha)
+              last_error = None
+              for attempt in range(1, 4):
+                  try:
+                      info = model_info(model, revision=revision)
+                      # A real provenance mismatch must fail immediately; only
+                      # transient lookup failures are retried.
+                      assert info.sha == revision, (model, info.sha, revision)
+                      print(model, info.sha)
+                      last_error = None
+                      break
+                  except AssertionError:
+                      raise
+                  except Exception as exc:
+                      last_error = exc
+                      print(
+                          f"{model}: revision lookup attempt {attempt}/3 failed: "
+                          f"{type(exc).__name__}: {exc}"
+                      )
+                      if attempt < 3:
+                          time.sleep(5 * attempt)
+              if last_error is not None:
+                  raise last_error
           PY
 
       - name: Run frozen transformer condition on development set
