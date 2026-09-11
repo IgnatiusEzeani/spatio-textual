@@ -1,0 +1,164 @@
+# SH2026 Release Candidate Checklist
+
+Purpose: one operational gate for the Spatial Humanities 2026 tutorial, demo and keynote evidence package.
+
+This checklist applies to an SH2026 release candidate such as `sh2026-rc1`. It is intentionally stricter than ordinary package development because the public workshop, hosted demo and keynote must all point to the same reproducible state.
+
+## 1. Freeze the release identity
+
+- [ ] Record the release branch/tag and exact Git commit.
+- [ ] Record the `spatio-textual` package version/commit used by SH2026.
+- [ ] Confirm `projects/sh2026/` is the only live SH2026 project root.
+- [ ] Confirm `spatio_textual/` contains no imports from `projects/sh2026`.
+- [ ] Confirm generated outputs and local secrets remain ignored.
+
+Release record:
+
+```text
+SH2026 tag:
+Git commit:
+spatio-textual version/commit:
+Release date:
+Validated by:
+```
+
+## 2. Automated validation
+
+The release candidate is not ready while a required current-head check is red or missing.
+
+- [ ] `tests` passes.
+- [ ] `Python package compatibility` passes for the supported Python matrix.
+- [ ] `SH2026 release smoke` passes.
+- [ ] `SH2026 benchmark smoke` passes.
+- [ ] `SH2026 rules TOPONYM benchmark` passes.
+- [ ] `SH2026 Hugging Face benchmark` passes.
+- [ ] `SH2026 rule journey development` passes.
+- [ ] `SH2026 transformer journey development` passes.
+- [ ] `SH2026 affect rule benchmark` passes.
+- [ ] `SH2026 affect transformer benchmark` passes.
+- [ ] `SH2026 CLDW external validation` passes.
+- [ ] `SH2026 Colab notebook smoke` passes all ten default notebooks.
+- [ ] Notebook smoke is verified to execute the checked-out candidate commit, not a previously published branch.
+
+Paid/formal LLM workflows remain separately guarded. A release should record whether they were intentionally run and which model/provider/version produced the retained outputs.
+
+## 3. Workshop notebooks
+
+- [ ] All ten notebooks open in Google Colab from a fresh browser session.
+- [ ] Notebook `00` installs the intended release branch/tag.
+- [ ] Every notebook can run independently or clearly states its prerequisite.
+- [ ] Default participant path is CPU-capable.
+- [ ] Default participant path does not require an API key.
+- [ ] Heavyweight/API-dependent sections have a documented fallback.
+- [ ] Re-running cells from the top does not corrupt paths or state.
+- [ ] Output directories remain under `sh2026_outputs/`.
+- [ ] No notebook prints, stores or commits credentials.
+- [ ] Links to `COMMON_SCHEMA.md`, annotation guidance and benchmark protocol resolve.
+
+Manual Colab record:
+
+```text
+Date:
+Browser:
+Runtime/Python:
+00: PASS/FAIL
+01: PASS/FAIL
+02: PASS/FAIL
+03: PASS/FAIL
+04: PASS/FAIL
+05: PASS/FAIL
+06: PASS/FAIL
+07: PASS/FAIL
+08: PASS/FAIL
+09: PASS/FAIL
+Notes:
+```
+
+## 4. Precomputed fallback pack
+
+Precomputed outputs are teaching/reliability assets, not substitutes for provenance.
+
+For every retained transformer or LLM fallback:
+
+- [ ] source example identifier is recorded;
+- [ ] backend/provider/model is recorded;
+- [ ] exact model revision is recorded where available;
+- [ ] generation date is recorded;
+- [ ] Git commit is recorded;
+- [ ] prompt/schema version is recorded where relevant;
+- [ ] telemetry is retained where available;
+- [ ] human edits, if any, are stored separately from raw output;
+- [ ] secrets are absent;
+- [ ] the fallback is clearly labelled as precomputed in the notebook/demo.
+
+Do not hand-edit a machine output and continue to describe it as raw model output.
+
+## 5. Hosted demo
+
+- [ ] `streamlit run projects/sh2026/demo/streamlit_app.py` starts successfully in the release environment.
+- [ ] Home, Analyse, Compare, Explore, Review and About pages load.
+- [ ] Public-safe examples load correctly.
+- [ ] The no-API-key path is fully usable.
+- [ ] Missing/failed optional LLM access degrades gracefully.
+- [ ] Named-place resolution exposes ambiguity/unresolved state rather than silently forcing a coordinate.
+- [ ] Affect is described as model-labelled signal, not psychological fact.
+- [ ] Journey evidence remains visible with explicit/inferred/missing provenance.
+- [ ] Human review produces an additive audit trail.
+- [ ] Map view preserves unresolved/unmappable evidence in an audit table.
+- [ ] Provenance page reports run manifest and telemetry without secrets.
+- [ ] Hosted deployment is tested from an incognito/private browser session.
+- [ ] A screenshot or recorded walkthrough exists as a presentation fallback.
+
+## 6. Benchmark and keynote evidence
+
+- [ ] `holdout_v1` checksum matches the frozen value.
+- [ ] Frozen benchmark data have not been tuned against after formal evaluation began.
+- [ ] Synthetic benchmark results are labelled synthetic and are not generalized to historical corpora.
+- [ ] CLDW external-validation claims match the documented external-validation protocol.
+- [ ] NER, journey and affect results used in slides can be traced to a results document/run artifact.
+- [ ] Every keynote metric has task, dataset, method/model and evaluation definition attached.
+- [ ] The talk distinguishes within-ontology accuracy from representational reach.
+- [ ] Review/correction burden is discussed where richer methods increase human validation work.
+- [ ] No method is presented as a universal winner based on a single metric.
+
+## 7. Data governance and sensitive material
+
+- [ ] No controlled-access Holocaust testimony transcript is bundled in the public repository, notebooks or hosted demo.
+- [ ] Public teaching passages have source/licence/distribution status recorded.
+- [ ] Synthetic oral-history-style passages are explicitly labelled synthetic.
+- [ ] Public workshop instructions do not ask participants to send sensitive archival or personal data to an external LLM provider.
+- [ ] No API keys, tokens, local `.env` files or private endpoints are committed.
+- [ ] Screenshots and slides have been checked for accidental sensitive text or credentials.
+
+## 8. Instructor and contingency package
+
+- [ ] `projects/sh2026/workshop/INSTRUCTOR_GUIDE.md` reflects the final notebook sequence and timings.
+- [ ] Five-minute contingency exercises are available.
+- [ ] Fifteen-minute contingency exercises are available.
+- [ ] Troubleshooting guidance is available.
+- [ ] A no-live-API teaching route has been rehearsed.
+- [ ] A no-demo/network-failure presentation route has been rehearsed.
+- [ ] The instructor has local copies of critical notebooks, figures and fallback outputs.
+
+## 9. Public links and presentation integration
+
+- [ ] Repository link resolves to the release state participants should use.
+- [ ] Colab links resolve to the intended notebooks.
+- [ ] Demo URL resolves and has been tested on a second device/network.
+- [ ] QR codes in slides/handouts point to stable public landing pages rather than transient branch URLs.
+- [ ] Keynote screenshots/figures correspond to the same release candidate as the demo/tutorial.
+- [ ] Any displayed model name/version matches the provenance record.
+
+## 10. Final go/no-go
+
+**GO** only when:
+
+1. required automated checks are green at the release commit;
+2. all ten default notebook paths have both automated CPU validation and at least one fresh manual Colab rehearsal;
+3. the hosted demo works without an API key;
+4. fallback outputs are provenance-complete;
+5. benchmark/keynote claims are traceable to frozen evidence;
+6. public-safe data boundaries have been checked;
+7. presentation fallbacks have been rehearsed.
+
+If one of these fails, keep the candidate as a pre-release and fix or explicitly narrow the advertised capability before tagging the conference release.
