@@ -5,7 +5,7 @@ on:
   pull_request:
     types: [synchronize]
     paths:
-      - ".github/sh2026_journey_transformer_scope"
+      - "projects/sh2026/config/journey_transformer_scope"
 
 permissions:
   contents: read
@@ -27,6 +27,7 @@ jobs:
       TOKENIZER_SHA256: 6391b03e805bd3f746473a3747e4f3a5dca27489cbcd666bc48164835d04c40e
       MODEL_TRAINING_HEAD_SHA: 272eb19fb4e906e0398616512f1fb0c1377b46fc
       SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SH2026_SCOPE_FILE: projects/sh2026/config/journey_transformer_scope
       TOKENIZERS_PARALLELISM: "false"
     steps:
       - uses: actions/checkout@v4
@@ -41,11 +42,11 @@ jobs:
             SCOPE="formal_holdout"
           else
             CHANGED=$(git diff-tree --no-commit-id --name-only -r "$SH2026_HEAD_SHA")
-            echo "$CHANGED" | grep -qx '.github/sh2026_journey_transformer_scope' || {
+            echo "$CHANGED" | grep -qx "$SH2026_SCOPE_FILE" || {
               echo "Formal transformer run not armed by the latest commit."
               exit 0
             }
-            SCOPE="$(tr -d '[:space:]' < .github/sh2026_journey_transformer_scope)"
+            SCOPE="$(tr -d '[:space:]' < "$SH2026_SCOPE_FILE")"
           fi
           test "$SCOPE" = "formal_holdout" || {
             echo "Formal transformer journey run not armed: $SCOPE"
@@ -109,15 +110,15 @@ jobs:
       - name: Build and verify frozen formal holdout
         if: env.SH2026_RUN_FORMAL_TRANSFORMER_JOURNEY == '1'
         run: |
-          python benchmarks/sh2026/build_holdout_v1.py
-          ACTUAL=$(sha256sum benchmarks/sh2026/holdout_v1.jsonl | cut -d' ' -f1)
+          python projects/sh2026/benchmarks/build_holdout_v1.py
+          ACTUAL=$(sha256sum projects/sh2026/benchmarks/holdout_v1.jsonl | cut -d' ' -f1)
           test "$ACTUAL" = "$HOLDOUT_SHA256"
 
       - name: Run frozen transformer journey holdout evaluation
         if: env.SH2026_RUN_FORMAL_TRANSFORMER_JOURNEY == '1'
         run: |
-          python scripts/run_sh2026_transformer_journey.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_transformer_journey.py \
+            projects/sh2026/benchmarks/holdout_v1.jsonl \
             --model-dir "$SH2026_FROZEN_MODEL_DIR" \
             --max-length 256 \
             --benchmark-mode \
@@ -164,6 +165,6 @@ jobs:
             sh2026_outputs/journey_transformer_formal/provenance.json
             sh2026_outputs/journey_transformer_formal/python_environment.txt
             sh2026_outputs/journey_transformer_formal/python_version.txt
-            docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md
+            projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md
           if-no-files-found: error
           retention-days: 30
