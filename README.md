@@ -2,6 +2,25 @@
 
 A Python package and Streamlit/HF Space platform for spatial textual annotation, testimony segmentation, entity linking, affect analysis, narrator-centred event extraction, telemetry and visualisation.
 
+## Repository design
+
+`spatio-textual` is the reusable library. Research, teaching and conference resources that use the library live under `projects/` rather than defining the package itself.
+
+```text
+spatio-textual/
+├── spatio_textual/          # reusable Python package
+├── tests/                   # package tests
+├── docs/                    # package documentation
+├── examples/                # generic package examples
+├── app.py                   # general Streamlit application
+└── projects/
+    └── sh2026/              # Spatial Humanities 2026 research/tutorial/demo layer
+```
+
+The package must not import from `projects/`. Project code may import the package through its public API.
+
+Spatial Humanities 2026 resources are collected in [`projects/sh2026/`](projects/sh2026/), including frozen benchmarks, experiment runners, workshop notebooks, keynote evidence and the conference Streamlit demo. Benchmark results are project-specific empirical results, not package guarantees.
+
 ## What changed in v0.3
 
 - Default high-quality NER option: `spacy:en_core_web_trf`.
