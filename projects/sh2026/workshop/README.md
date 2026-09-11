@@ -50,10 +50,10 @@ By the end of the day, participants should be able to:
 | `00_setup_and_orientation.ipynb` | Setup, location/locale/sense of place, common schema | Implemented |
 | `01_manual_annotation.ipynb` | Human reference annotation and disagreement | Implemented |
 | `02_rules_and_gazetteers.ipynb` | Deterministic baseline and rule failure analysis | Implemented |
-| `03_contextual_ner.ipynb` | spaCy/HF NER, ontology ceiling, representational reach | Implemented |
+| `03_contextual_ner.ipynb` | spaCy/HF NER, ontology ceiling, representational reach | Implemented + pinned HF fallback |
 | `04_linking_and_ambiguity.ipynb` | Entity resolution, ambiguity, historical geography | Implemented |
-| `05_affect_and_events.ipynb` | Sentiment, emotion and narrator-centred events | Implemented |
-| `06_llm_structured_extraction.ipynb` | Evidence-first structured journey extraction | Implemented |
+| `05_affect_and_events.ipynb` | Sentiment, emotion and narrator-centred events | Implemented + pinned transformer fallback |
+| `06_llm_structured_extraction.ipynb` | Evidence-first structured journey extraction | Implemented + deterministic no-API teaching route |
 | `07_compare_and_adjudicate.ipynb` | Model disagreement, human review and correction burden | Implemented |
 | `08_from_text_to_map.ipynb` | Entity/journey GeoJSON, route audit and mapping | Implemented |
 | `09_responsible_spatial_ai.ipynb` | Provenance, uncertainty, governance and release audit | Implemented |
@@ -82,7 +82,7 @@ Use bounded gazetteers/project resources, a deterministic EntityRuler/regex base
 
 ### 03 · Contextual NER — 55 min
 
-Separate contextual spaCy NER from spaCy + project resources; optionally compare HF NER; harmonise labels; distinguish within-ontology accuracy from representational reach.
+Separate contextual spaCy NER from spaCy + project resources; compare a revision-pinned HF NER condition through either the default precomputed teaching fallback or the optional live heavyweight route; harmonise labels; distinguish within-ontology accuracy from representational reach.
 
 **Message:** context helps, but the training ontology still constrains what the model can see.
 
@@ -94,13 +94,13 @@ Separate NER from entity resolution; inspect offline `GeoResolver` output, candi
 
 ### 05 · Affect and narrator-centred events — 50 min
 
-Compare sentiment/emotion rule baselines, inspect lexical cues and domain assumptions, optionally compare HF output, and examine narrator-centred movement/action events.
+Compare sentiment/emotion rule baselines with a revision-pinned transformer condition, using a genuine precomputed teaching fallback on the default route and the same pinned models on the optional live route; inspect lexical cues and domain assumptions; and examine narrator-centred movement/action events.
 
 **Message:** model-labelled affect is an analytical signal, not psychological ground truth.
 
 ### 06 · Evidence-first LLM structured extraction — 60 min
 
-Inspect the journey JSON contract, require verbatim source evidence, compute offsets locally, distinguish `explicit`, `contextual_inference` and `missing`, expose unsupported/schema-invalid output, and optionally make a live provider call. The default path already uses deterministic teaching clients and therefore does not require an API key.
+Inspect the journey JSON contract, require verbatim source evidence, compute offsets locally, distinguish `explicit`, `contextual_inference` and `missing`, expose unsupported/schema-invalid output, and optionally make a live provider call. The default path already uses deterministic teaching clients and therefore does not require an API key or pretend that a simulated response is empirical LLM evidence.
 
 **Message:** the useful LLM pattern is constrained extraction + evidence + validation, not fluent generation.
 
@@ -181,16 +181,21 @@ The operational go/no-go checklist is `projects/sh2026/docs/RELEASE_CHECKLIST.md
 
 ## Instructor and fallback package
 
-`INSTRUCTOR_GUIDE.md` provides the delivery sequence, troubleshooting guidance, no-network/no-API routes and 5-minute/15-minute contingencies. The hosted demo now also has a public-safe curated journey fallback (`projects/sh2026/demo/fallback_journeys_v1.json`) with evidence-grounding tests and explicit labelling that it is teaching material rather than an LLM prediction.
+`INSTRUCTOR_GUIDE.md` provides the delivery sequence, troubleshooting guidance, no-network/no-API routes and 5-minute/15-minute contingencies. The fallback package is now explicit and provenance-indexed in `projects/sh2026/demo/fallback_manifest_v1.json`:
 
-Before `sh2026-rc1`, the remaining packaging work is narrower: freeze any retained **machine-generated** transformer/LLM fallback outputs with complete model/prompt/commit provenance, record a fresh manual Colab run, rehearse the hosted demo, and keep local presentation copies of the critical figures/notebooks.
+- `fallback_journeys_v1.json`: instructor-curated journey examples for schema/evidence/review teaching, not model predictions;
+- `ner_transformer_teaching_fallback_v1.json`: real revision-pinned Hugging Face NER output for Notebook 03;
+- `affect_transformer_teaching_fallback_v1.json`: real revision-pinned transformer affect output for Notebook 05.
+
+Notebook 06 already has a deterministic no-API teaching client, so we do **not** manufacture a fake LLM fallback simply to populate the package. A future retained live-LLM output should be added only if it is genuinely needed and provenance-complete.
 
 ## Current implementation block
 
-1. Keep current-head CI green after the evidence-first demo and fallback changes.
-2. Use `projects/sh2026/benchmarks/results_snapshot_v1.json` as the single reportable metric feed for the conference demo/keynote, rather than hard-coded UI numbers.
-3. Complete provenance-complete machine-output fallbacks only for optional heavyweight/API sections that genuinely need them; do not relabel curated teaching examples as model output.
-4. Rehearse the hosted Streamlit demo from a clean browser with no API key, then with optional live LLM access.
-5. Run the final manual Google Colab rehearsal and record it in the release checklist.
+1. Keep a stable current head and allow the full CI suite, especially `SH2026 Colab notebook smoke`, to finish.
+2. Use `projects/sh2026/benchmarks/results_snapshot_v1.json` as the single reportable metric feed for the conference demo/keynote; fallback files are teaching/reliability assets, not benchmark substitutes.
+3. Run one fresh manual Google Colab rehearsal of all ten notebooks from the release candidate and record it in the release checklist.
+4. Rehearse the hosted Streamlit demo from a clean/private browser with no API key, then optionally with server-side live LLM access.
+5. Capture the presentation contingency package: local critical notebooks/figures plus screenshots or a short recorded demo walkthrough.
+6. Freeze the RC identity/tag only after those gates pass.
 
-The workshop core is structurally complete. The remaining work is release validation, selective machine-output fallback packaging and presentation rehearsal rather than notebook construction.
+The workshop core and the heavyweight teaching fallback package are structurally complete. The remaining work is release validation and presentation rehearsal, not further notebook construction.
