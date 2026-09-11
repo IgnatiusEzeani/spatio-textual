@@ -53,6 +53,17 @@ The app never asks a visitor to paste an API key into the interface.
 
 `fallback_journeys_v1.json` contains instructor-curated, public-safe records used only to demonstrate the journey schema, local evidence grounding, explicit/contextual/missing field provenance, and human review. They are **not model predictions** and **not benchmark results**. The fallback is only used when the selected teaching passage is unchanged, so a cached example is never silently attached to edited text.
 
+### Workshop transformer fallbacks
+
+The workshop now includes two genuine precomputed machine-output fallbacks for heavyweight optional sections:
+
+- `affect_transformer_teaching_fallback_v1.json` for Notebook 05, generated with the exact pinned Cardiff sentiment and Hartmann emotion model revisions used by the SH2026 transformer affect condition;
+- `ner_transformer_teaching_fallback_v1.json` for Notebook 03, generated with `dslim/bert-base-NER` at revision `0b95561fd0c304538b5eb8a0ee532ca24dd009b9`.
+
+Both files retain their source passages, exact model revisions, generation commits and telemetry. They are **precomputed model outputs for teaching continuity**, not formal holdout benchmark results. Notebook 03 and Notebook 05 use these files on their default fast path and can reproduce the same revision-pinned model conditions live when the heavyweight path is enabled.
+
+`fallback_manifest_v1.json` is the compact provenance index for all conference fallback assets. It explicitly distinguishes instructor-curated journey examples from precomputed transformer output and from benchmark evidence.
+
 ## Evidence and review behaviour
 
 The demo keeps original source text visible and highlights character-grounded annotations. Structured journey cards display the exact evidence quote, evidence-grounding state, per-field provenance, confidence when supplied, and review requirement.
@@ -75,6 +86,7 @@ Before a public deployment:
 
 - run the app with no `OPENAI_API_KEY` and exercise all six pages;
 - test at least one curated journey fallback and one example with no fallback;
+- execute Notebook 03 and Notebook 05 on their default precomputed paths and confirm the provenance labels are visible;
 - verify highlighted spans and affect charts render on a phone/tablet-sized browser as well as desktop;
 - test one ambiguous/unresolved place through accept/edit/reject review;
 - confirm map failure/unresolved cases remain visible rather than disappearing;
