@@ -18,6 +18,15 @@ def test_reusable_package_does_not_import_sh2026_project_layer():
     assert not offenders, "Reusable package depends on SH2026 project layer: " + ", ".join(offenders)
 
 
+def test_reusable_package_is_conference_agnostic():
+    offenders: list[str] = []
+    for path in PACKAGE.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "SH2026" in source or "Spatial Humanities 2026" in source:
+            offenders.append(str(path.relative_to(ROOT)))
+    assert not offenders, "Reusable package contains conference-specific naming: " + ", ".join(offenders)
+
+
 def test_sh2026_has_single_project_scoped_home():
     assert PROJECT.is_dir()
     for required in ("benchmarks", "demo", "docs", "scripts", "tests", "workshop"):
