@@ -37,6 +37,8 @@ The release candidate is not ready while a required current-head check is red or
 - [ ] `SH2026 affect rule benchmark` passes.
 - [ ] `SH2026 affect transformer benchmark` passes.
 - [ ] `SH2026 CLDW external validation` passes.
+- [ ] `SH2026 affect teaching fallback` passes and regenerates the pinned Notebook 05 fallback successfully.
+- [ ] `SH2026 NER teaching fallback` passes and regenerates the pinned Notebook 03 fallback successfully.
 - [ ] `SH2026 Colab notebook smoke` passes all ten default notebooks.
 - [ ] Notebook smoke is verified to execute the checked-out candidate commit, not a previously published branch.
 
@@ -49,7 +51,11 @@ Paid/formal LLM workflows remain separately guarded. A release should record whe
 - [ ] Every notebook can run independently or clearly states its prerequisite.
 - [ ] Default participant path is CPU-capable.
 - [ ] Default participant path does not require an API key.
-- [ ] Heavyweight/API-dependent sections have a documented fallback.
+- [ ] Notebook `03` loads the revision-pinned NER teaching fallback on the default fast path and identifies it as precomputed rather than benchmark evidence.
+- [ ] Notebook `03` live/heavy path uses `dslim/bert-base-NER` at revision `0b95561fd0c304538b5eb8a0ee532ca24dd009b9`.
+- [ ] Notebook `05` loads the revision-pinned affect teaching fallback on the default fast path and identifies it as precomputed rather than benchmark evidence.
+- [ ] Notebook `05` live/heavy path uses the same pinned Cardiff/Hartmann model revisions recorded in the fallback.
+- [ ] Notebook `06` default route remains deterministic/no-API and clearly distinguishes teaching simulation from empirical LLM output.
 - [ ] Re-running cells from the top does not corrupt paths or state.
 - [ ] Output directories remain under `sh2026_outputs/`.
 - [ ] No notebook prints, stores or commits credentials.
@@ -76,7 +82,19 @@ Notes:
 
 ## 4. Fallback and contingency pack
 
-Fallback material must be explicit about what it is. A curated teaching example is not a model prediction; a cached model output is not a live run.
+Fallback material must be explicit about what it is. A curated teaching example is not a model prediction; a cached model output is not a live run; neither is automatically benchmark evidence.
+
+The canonical fallback index is `projects/sh2026/demo/fallback_manifest_v1.json`. It currently distinguishes three assets:
+
+- `fallback_journeys_v1.json`: instructor-curated journey teaching material;
+- `ner_transformer_teaching_fallback_v1.json`: real revision-pinned Hugging Face NER output for Notebook 03;
+- `affect_transformer_teaching_fallback_v1.json`: real revision-pinned transformer affect output for Notebook 05.
+
+Release checks:
+
+- [ ] `fallback_manifest_v1.json` resolves every retained fallback file.
+- [ ] Every manifest entry states whether it is curated teaching material or precomputed machine output.
+- [ ] Every manifest entry states `benchmark_result: false`; formal benchmark claims continue to come from the benchmark evidence path.
 
 For **curated teaching fallbacks**:
 
@@ -100,7 +118,7 @@ For every retained **transformer or LLM model-output fallback**:
 - [ ] secrets are absent;
 - [ ] the fallback is clearly labelled as precomputed in the notebook/demo.
 
-Do not hand-edit a machine output and continue to describe it as raw model output.
+Do not hand-edit a machine output and continue to describe it as raw model output. Do not create a synthetic/fabricated LLM output merely to fill a fallback slot; Notebook 06's deterministic teaching client is intentionally labelled as a teaching mechanism rather than empirical LLM evidence.
 
 ## 5. Hosted demo
 
@@ -130,6 +148,7 @@ Do not hand-edit a machine output and continue to describe it as raw model outpu
 - [ ] NER, journey and affect results used in slides can be traced to a results document/run artifact.
 - [ ] Every keynote metric has task, dataset, method/model and evaluation definition attached.
 - [ ] `results_snapshot_v1.json` remains the single reportable feed used by the demo/keynote figure generator.
+- [ ] Teaching fallback metrics are not copied into `results_snapshot_v1.json` merely because they are convenient or visually useful.
 - [ ] Any condition marked `not_reportable` remains excluded from scored public tables/figures.
 - [ ] The talk distinguishes within-ontology accuracy from representational reach.
 - [ ] Review/correction burden is discussed where richer methods increase human validation work.
