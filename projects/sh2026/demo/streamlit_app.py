@@ -27,6 +27,7 @@ REPO_ROOT = PROJECT_ROOT.parents[1]
 WORKSHOP_DATA = PROJECT_ROOT / "workshop" / "data"
 EXAMPLES_PATH = WORKSHOP_DATA / "examples.json"
 TEACHING_GAZETTEER = WORKSHOP_DATA / "teaching_gazetteer.csv"
+BENCHMARK_SNAPSHOT_PATH = PROJECT_ROOT / "benchmarks" / "results_snapshot_v1.json"
 PACKAGE_RESOURCES = REPO_ROOT / "spatio_textual" / "resources"
 
 st.set_page_config(
@@ -42,6 +43,13 @@ def load_examples() -> list[dict[str, Any]]:
     if not EXAMPLES_PATH.exists():
         return []
     return json.loads(EXAMPLES_PATH.read_text(encoding="utf-8"))
+
+
+@st.cache_data
+def load_benchmark_snapshot() -> dict[str, Any]:
+    if not BENCHMARK_SNAPSHOT_PATH.exists():
+        return {"rows": [], "omissions": []}
+    return json.loads(BENCHMARK_SNAPSHOT_PATH.read_text(encoding="utf-8"))
 
 
 @st.cache_resource
@@ -177,24 +185,53 @@ def render_map(records: list[dict[str, Any]], journeys: list[dict[str, Any]]) ->
         st.dataframe(pd.DataFrame(route_geo["audit"]), use_container_width=True, hide_index=True)
 
 
+def _results_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    frame = frame[["task", "method", "precision", "recall", "f1"]].rename(
+        columns={
+            "task": "Task",
+            "method": "Method",
+            "precision": "Precision",
+            "recall": "Recall",
+            "f1": "F1",
+        }
+    )
+    return frame
+
+
 def benchmark_snapshot() -> None:
     st.markdown("### Frozen SH2026 benchmark snapshot")
-    st.caption("These are project-specific empirical results, not package performance guarantees.")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Task": "TOPONYM", "Method": "Rules", "Precision": 1.000, "Recall": 0.073, "F1": 0.136},
-                {"Task": "TOPONYM", "Method": "spaCy", "Precision": 0.962, "Recall": 0.610, "F1": 0.746},
-                {"Task": "TOPONYM", "Method": "HF BERT", "Precision": 0.952, "Recall": 0.976, "F1": 0.964},
-                {"Task": "TOPONYM", "Method": "GPT-5.6 Sol", "Precision": 0.976, "Recall": 1.000, "F1": 0.988},
-                {"Task": "Journey", "Method": "Rules", "Precision": 0.944, "Recall": 0.944, "F1": 0.944},
-                {"Task": "Journey", "Method": "Transformer", "Precision": 0.882, "Recall": 0.833, "F1": 0.857},
-                {"Task": "Journey", "Method": "GPT-5.6 Sol", "Precision": 0.750, "Recall": 1.000, "F1": 0.857},
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True,
+    st.caption(
+        "Only artifact-backed, reportable rows are shown. Synthetic controlled results and source-derived CLDW validation are kept separate."
     )
+    snapshot = load_benchmark_snapshot()
+    rows = [row for row in snapshot.get("rows", []) if row.get("status") == "reportable"]
+    synthetic = [row for row in rows if row.get("dataset") == "Synthetic holdout v1"]
+    external = [row for row in rows if row.get("dataset") == "CLDW external validation"]
+
+    if synthetic:
+        st.markdown("#### Synthetic controlled holdout")
+        st.dataframe(_results_frame(synthetic), use_container_width=True, hide_index=True)
+    else:
+        st.warning("No reportable synthetic benchmark rows are available in the release snapshot.")
+
+    if external:
+        with st.expander("Source-derived CLDW TOPONYM validation"):
+            st.dataframe(_results_frame(external), use_container_width=True, hide_index=True)
+            st.caption(
+                "The CLDW check uses a small purposively selected source-derived sample; it is not a population-level estimate for the corpus."
+            )
+
+    omissions = snapshot.get("omissions", [])
+    for omission in omissions:
+        if omission.get("status") == "not_reportable":
+            st.warning(
+                f"{omission.get('task')} / {omission.get('method')} is not shown as a scored result: "
+                f"{omission.get('reason')}"
+            )
+
     st.info(
         "Read the table as a trade-off, not a leaderboard: representational reach, evidence, inference and review burden change with the method."
     )
@@ -381,4 +418,5 @@ elif page == "About":
         "telemetry_summary": summarize_telemetry(telemetry_rows(records)) if records else {},
         "common_schema": "projects/sh2026/docs/COMMON_SCHEMA.md",
         "benchmark_protocol": "projects/sh2026/docs/BENCHMARK_PROTOCOL.md",
+        "benchmark_snapshot": "projects/sh2026/benchmarks/results_snapshot_v1.json",
     })
