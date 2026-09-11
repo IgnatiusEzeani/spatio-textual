@@ -30,7 +30,7 @@ Rayson, P., Reinhold, A., Butler, J., Donaldson, C. E., Gregory, I. N., & Taylor
 
 The exact ten source files are recorded in:
 
-`benchmarks/sh2026/cldw_external_manifest_v1.json`
+`projects/sh2026/benchmarks/cldw_external_manifest_v1.json`
 
 They provide a chronological spread within the already curated CLDW gold-standard subcorpus. This is a purposive source-derived validation sample, not a claim of random sampling or statistical representativeness of all historical writing.
 

@@ -211,7 +211,7 @@ sh2026_outputs/
   human_review/
 ```
 
-Outputs should follow `docs/sh2026/COMMON_SCHEMA.md` so selected tables and figures can be reused directly in the hosted demo and keynote.
+Outputs should follow `projects/sh2026/docs/COMMON_SCHEMA.md` so selected tables and figures can be reused directly in the hosted demo and keynote.
 
 ## Colab reliability requirements
 

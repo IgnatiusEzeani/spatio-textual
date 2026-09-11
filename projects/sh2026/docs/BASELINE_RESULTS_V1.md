@@ -2,7 +2,7 @@
 
 Status: **measured on frozen synthetic holdout; suitable for internal/keynote development with the claim boundaries below**
 
-Benchmark: `benchmarks/sh2026/holdout_v1.jsonl`
+Benchmark: `projects/sh2026/benchmarks/holdout_v1.jsonl`
 
 Holdout SHA-256: `be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b`
 
