@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from spatio_textual.journeys import normalise_model_journey, validate_runtime_journey
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP = PROJECT_ROOT / "demo" / "streamlit_app.py"
@@ -48,19 +50,31 @@ def test_curated_fallbacks_are_public_safe_and_evidence_grounded():
         example = examples[example_id]
         assert example["distribution_status"] == "safe_to_distribute"
         source_text = example["text"]
-        for journey in journeys:
-            quote = journey["evidence_quote"]
+        for raw in journeys:
+            quote = raw["evidence_quote"]
             assert quote
             assert quote in source_text
-            assert set(journey["explicit_or_inferred"]) == JOURNEY_FIELDS
-            assert set(journey["explicit_or_inferred"].values()) <= VALID_STATUSES
+            assert set(raw["explicit_or_inferred"]) == JOURNEY_FIELDS
+            assert set(raw["explicit_or_inferred"].values()) <= VALID_STATUSES
             for field in JOURNEY_FIELDS:
-                status = journey["explicit_or_inferred"][field]
-                value = journey[field]
+                status = raw["explicit_or_inferred"][field]
+                value = raw[field]
                 if status == "missing":
                     assert value is None
                 else:
                     assert value not in (None, "")
+
+            runtime = normalise_model_journey(
+                raw,
+                source_text=source_text,
+                file_id=f"test:{example_id}",
+                seg_id=1,
+                model="instructor_curated_v1",
+                provider="sh2026",
+            )
+            assert runtime["evidence_grounded"] is True
+            assert runtime["evidence_match_count"] == 1
+            assert validate_runtime_journey(runtime, source_text) == []
 
 
 def test_curated_fallback_does_not_cover_source_derived_cldw_example():
