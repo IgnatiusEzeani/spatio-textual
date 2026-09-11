@@ -4,16 +4,17 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "sh2026_app.py"
-      - "scripts/sh2026_workshop_smoke.py"
+      - "projects/sh2026/demo/**"
+      - "projects/sh2026/scripts/sh2026_workshop_smoke.py"
+      - "projects/sh2026/workshop/**"
       - "spatio_textual/**"
-      - "tutorials/sh2026/**"
       - "requirements-lite.txt"
       - ".github/workflows/sh2026-release-smoke.yml"
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -27,11 +28,13 @@ jobs:
           python -m pip install -r requirements-lite.txt
 
       - name: Run CPU-safe workshop path end to end
-        run: python scripts/sh2026_workshop_smoke.py
+        run: python projects/sh2026/scripts/sh2026_workshop_smoke.py
 
-      - name: Start SH2026 Streamlit app
+      - name: Start project-scoped SH2026 Streamlit app
+        env:
+          OPENAI_API_KEY: ""
         run: |
-          streamlit run sh2026_app.py \
+          streamlit run projects/sh2026/demo/streamlit_app.py \
             --server.headless true \
             --server.address 127.0.0.1 \
             --server.port 8501 \
