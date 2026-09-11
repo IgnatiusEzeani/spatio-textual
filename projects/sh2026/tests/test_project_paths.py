@@ -32,6 +32,7 @@ NOTEBOOK_LEGACY_SNIPPETS = (
     "tutorials/sh2026/",
     "docs/sh2026/",
     "benchmarks/sh2026/",
+    "projects/sh2026/projects/sh2026/",
 )
 
 # Broader text-level audit for live project documentation and GitHub Actions.
@@ -43,6 +44,7 @@ LEGACY_TEXT_PATTERNS = (
     re.compile(r"(?<!projects/sh2026/)benchmarks/sh2026/"),
     re.compile(r"(?<!projects/sh2026/)scripts/(?:run|generate|train)_sh2026_"),
     re.compile(r"(?<!projects/sh2026/demo/)sh2026_app\.py"),
+    re.compile(r"projects/sh2026/projects/sh2026/"),
 )
 
 
