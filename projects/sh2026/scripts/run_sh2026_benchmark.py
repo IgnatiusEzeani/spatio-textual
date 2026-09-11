@@ -23,6 +23,8 @@ DEFAULT_HF_MODEL = "dslim/bert-base-NER"
 # Pinned after the safetensors model was present; later upstream changes are
 # mainly model-card edits. Formal SH2026 runs should record this exact revision.
 DEFAULT_HF_REVISION = "0b95561fd0c304538b5eb8a0ee532ca24dd009b9"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_GAZETTEER = PROJECT_ROOT / "workshop" / "data" / "teaching_gazetteer.csv"
 
 
 def _parse_args() -> argparse.Namespace:
@@ -36,7 +38,7 @@ def _parse_args() -> argparse.Namespace:
         default="rules",
         help="Comma-separated: rules,spacy,spacy_resources,hf",
     )
-    p.add_argument("--gazetteer", type=Path, default=Path("tutorials/sh2026/data/teaching_gazetteer.csv"))
+    p.add_argument("--gazetteer", type=Path, default=DEFAULT_GAZETTEER)
     p.add_argument("--spacy-model", default="en_core_web_sm")
     p.add_argument(
         "--hf-model",
