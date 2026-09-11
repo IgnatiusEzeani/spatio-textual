@@ -12,7 +12,8 @@ JOURNEY_FIELDS = ("start_location", "end_location", "transport_mode", "date", "j
 
 MOVEMENT_LEMMAS = {
     "arrive", "continue", "cross", "cycle", "depart", "drive", "escape", "flee", "fly",
-    "go", "journey", "leave", "move", "relocate", "return", "sail", "settle", "travel", "walk",
+    "go", "journey", "leave", "move", "reach", "relocate", "return", "ride", "sail", "settle",
+    "take", "travel", "walk",
 }
 DESTINATION_LEMMAS = {"arrive", "reach", "relocate", "settle"}
 SOURCE_LEMMAS = {"depart", "leave"}
@@ -42,24 +43,33 @@ TRANSPORT_ALIASES = {
 
 # Capitalised place-like phrases after a journey preposition are a transparent
 # fallback when generic NER misses a place. Lower-case connectors support forms
-# such as "Dar es Salaam" without introducing a task-specific gazetteer.
+# such as "Dar es Salaam" without introducing a task-specific gazetteer. Case
+# insensitivity is applied only to the lexical cue, never to the place pattern.
 PLACE_PHRASE = r"[A-Z][\w'.-]*(?:\s+(?:(?:[A-Z][\w'.-]*)|(?:es|of|the|and))){0,3}"
-FROM_RE = re.compile(rf"\bfrom\s+(?P<place>{PLACE_PHRASE})")
-TO_RE = re.compile(rf"\b(?:to|toward|towards|into)\s+(?P<place>{PLACE_PHRASE})")
-ARRIVAL_RE = re.compile(rf"\b(?:arrived|reached|settled|relocated)\s+(?:in|at|to)\s+(?P<place>{PLACE_PHRASE})", re.I)
-LEAVE_RE = re.compile(rf"\b(?:left|departed(?:\s+from)?)\s+(?P<place>{PLACE_PHRASE})", re.I)
-STATIC_IN_RE = re.compile(rf"\b(?:in|at)\s+(?P<place>{PLACE_PHRASE})")
+FROM_RE = re.compile(rf"\b(?i:from)\s+(?P<place>{PLACE_PHRASE})")
+TO_RE = re.compile(rf"\b(?i:to|toward|towards|into)\s+(?P<place>{PLACE_PHRASE})")
+ARRIVAL_RE = re.compile(rf"\b(?i:arrived|reached|settled|relocated)\s+(?i:in|at|to)\s+(?P<place>{PLACE_PHRASE})")
+LEAVE_RE = re.compile(rf"\b(?i:left|departed(?:\s+from)?)\s+(?P<place>{PLACE_PHRASE})")
+STATIC_IN_RE = re.compile(rf"\b(?i:in|at)\s+(?P<place>{PLACE_PHRASE})")
 
 TRANSPORT_RE = re.compile(
     r"\b(?:by\s+|on\s+)(train|rail|coach|bus|car|taxi|ferry|boat|ship|plane|air|bicycle|bike|foot)\b",
     re.I,
 )
+DAY = r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
+MONTH = r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+# Specific surface-preserving patterns come before generic NER so the rule
+# baseline keeps expressions such as "On Monday" or "In May" when that is what
+# the source/reference records as the date phrase.
 TIME_PATTERNS = [
+    re.compile(rf"^On\s+(?:{DAY}|\d{{1,2}}\s+{MONTH})\b", re.I),
+    re.compile(rf"^In\s+(?:{MONTH}|(?:19|20)\d{{2}})\b", re.I),
+    re.compile(r"^(?:At sunrise|At dawn|Late that evening|The following morning|Two days later)\b", re.I),
+    re.compile(r"\bbefore noon\b", re.I),
     re.compile(r"\b(?:19|20)\d{2}\b"),
-    re.compile(r"\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", re.I),
-    re.compile(r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b", re.I),
-    re.compile(r"\b(?:before noon|at sunrise|at dawn|late that evening|the following morning|two days later)\b", re.I),
-    re.compile(r"\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\b", re.I),
+    re.compile(rf"\b{DAY}\b", re.I),
+    re.compile(rf"\b{MONTH}\b", re.I),
+    re.compile(rf"\b\d{{1,2}}\s+{MONTH}\b", re.I),
 ]
 PURPOSE_TO_RE = re.compile(r"\bto\s+(visit|attend|deliver|meet|work|study|join|escape)\b[^,.;]*", re.I)
 FOR_REASON_RE = re.compile(r"\bfor\s+(?:an?\s+|the\s+)?[^,.;]+", re.I)
@@ -122,12 +132,9 @@ class RuleDependencyJourneyExtractor:
         for ent in sent.ents:
             if ent.label_ in {"GPE", "LOC", "FAC"} and ent.text not in out:
                 out.append(ent.text)
-        # Generic dependency fallback: a proper-noun object of a locative
-        # preposition can still act as a place candidate when NER misses it.
         for token in sent:
             if token.pos_ == "PROPN" and token.dep_ == "pobj" and token.head.lower_ in {"from", "to", "toward", "towards", "in", "at", "into"}:
-                phrase = " ".join(t.text for t in token.subtree)
-                phrase = _normalise_space(phrase)
+                phrase = _normalise_space(" ".join(t.text for t in token.subtree))
                 if phrase and phrase not in out:
                     out.append(phrase)
         return out
@@ -152,9 +159,6 @@ class RuleDependencyJourneyExtractor:
             if destination is None and places:
                 destination = places[-1]
 
-        # Generic dependency/preposition fallback after NER. This is deliberately
-        # conservative: with two recognised places and no explicit source/dest,
-        # do not guess their roles.
         if source is None:
             for token in sent:
                 if token.lower_ == "from":
@@ -177,10 +181,12 @@ class RuleDependencyJourneyExtractor:
         if match:
             return TRANSPORT_ALIASES.get(match.group(1).lower(), match.group(1).lower()), "explicit"
         lower = sentence.lower()
-        if "took the train" in lower:
+        if "took the train" in lower or "took a train" in lower:
             return "train", "explicit"
-        if "took a train" in lower:
-            return "train", "explicit"
+        if "took the bus" in lower or "took a bus" in lower:
+            return "bus", "explicit"
+        if "took the ferry" in lower or "took a ferry" in lower:
+            return "ferry", "explicit"
         for lemma in movement:
             if lemma in IMPLIED_TRANSPORT:
                 return IMPLIED_TRANSPORT[lemma], "contextual_inference"
@@ -188,19 +194,17 @@ class RuleDependencyJourneyExtractor:
 
     @staticmethod
     def _date(sent) -> str | None:
-        for ent in sent.ents:
-            if ent.label_ in {"DATE", "TIME"}:
-                return _normalise_space(ent.text)
         for pattern in TIME_PATTERNS:
             match = pattern.search(sent.text)
             if match:
                 return _normalise_space(match.group(0))
+        for ent in sent.ents:
+            if ent.label_ in {"DATE", "TIME"}:
+                return _normalise_space(ent.text)
         return None
 
     @staticmethod
     def _reason(sentence: str) -> tuple[str | None, str]:
-        # Purpose can precede the movement clause ("For a conference, ...") or
-        # follow it. Duration phrases are filtered out to avoid treating them as reasons.
         match = FOR_REASON_RE.search(sentence)
         if match:
             value = _normalise_space(match.group(0))
@@ -260,8 +264,6 @@ class RuleDependencyJourneyExtractor:
                     source = inherited
                     source_inferred = True
 
-            # A movement word without any reconstructable spatial endpoint is not
-            # enough to call the passage a journey in this baseline.
             if source is None and destination is None:
                 continue
 
