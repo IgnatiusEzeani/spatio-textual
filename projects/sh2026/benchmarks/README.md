@@ -4,22 +4,22 @@ This directory contains the frozen **synthetic held-out benchmark** used to gene
 
 ## Why a separate holdout exists
 
-The teaching reference in `tutorials/sh2026/data/gold_reference_v0.1.jsonl` has already influenced notebook design, rules, examples and prompts. It is therefore a development set, not an unbiased benchmark.
+The teaching reference in `projects/sh2026/workshop/data/gold_reference_v0.1.jsonl` has already influenced notebook design, rules, examples and prompts. It is therefore a development set, not an unbiased benchmark.
 
 `holdout_v1` was created only after the annotation policy and comparison protocol had been defined. It must not be used for subsequent prompt/rule tuning while continuing to be described as held out.
 
 ## Reproducible generation
 
-The benchmark is generated deterministically:
+The benchmark is generated deterministically from the frozen `holdout_spec_v1.py` specification:
 
 ```bash
-python benchmarks/sh2026/build_holdout_v1.py
+python projects/sh2026/benchmarks/build_holdout_v1.py
 ```
 
 Expected output:
 
 ```text
-benchmarks/sh2026/holdout_v1.jsonl
+projects/sh2026/benchmarks/holdout_v1.jsonl
 ```
 
 Expected SHA-256:
@@ -54,4 +54,6 @@ Historical/source-derived external validation remains a separate release task. P
 
 Any content change to the benchmark requires a new version (`holdout_v2`, etc.) and a new checksum. Do not modify `holdout_v1` after formal model runs have begun.
 
-The canonical annotation policy is `docs/sh2026/GOLD_ANNOTATION_GUIDE.md`; the evaluation policy is `docs/sh2026/BENCHMARK_PROTOCOL.md`.
+The canonical annotation policy is `projects/sh2026/docs/GOLD_ANNOTATION_GUIDE.md`; the evaluation policy is `projects/sh2026/docs/BENCHMARK_PROTOCOL.md`.
+
+The v1 records retain their original `annotation_policy` metadata string for byte-for-byte reproducibility. That historical string points to the pre-disaggregation path; the live document now resides under `projects/sh2026/docs/`.
