@@ -10,7 +10,7 @@ on:
       - "spatio_textual/journey_rules.py"
       - "spatio_textual/journey_benchmark.py"
       - "spatio_textual/journey_evaluation.py"
-      - "tests/test_journey_dev_builder.py"
+      - "projects/sh2026/tests/test_journey_dev_builder.py"
       - "tests/test_journey_rules.py"
       - ".github/workflows/sh2026-journey-rules.yml"
 
