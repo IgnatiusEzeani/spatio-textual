@@ -10,6 +10,7 @@ on:
       - "spatio_textual/journey_transformer.py"
       - "spatio_textual/journey_benchmark.py"
       - "spatio_textual/journey_evaluation.py"
+      - "tests/test_journey_transformer.py"
       - "docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md"
       - ".github/workflows/sh2026-journey-transformer-dev.yml"
 
@@ -22,6 +23,7 @@ jobs:
       TOKENIZERS_PARALLELISM: "false"
       DEV_SHA256: a5b89a40d0d0f7be1b3994852fa041c262ee56535d9ef400e50558d00666421b
       BASE_MODEL: distilbert/distilbert-base-cased
+      BASE_REVISION: 6ea81172465e8b0ad3fddeed32b986cdcdcffcf0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/huggingface
-          key: sh2026-journey-transformer-distilbert-cased-dev-v1
+          key: sh2026-journey-transformer-distilbert-cased-${{ env.BASE_REVISION }}-dev-v1
 
       - name: Install transformer journey environment
         run: |
@@ -57,6 +59,7 @@ jobs:
           python scripts/train_sh2026_journey_transformer.py \
             sh2026_outputs/journey_transformer_dev/journey_dev_v1.jsonl \
             --base-model "$BASE_MODEL" \
+            --revision "$BASE_REVISION" \
             --epochs 5 \
             --batch-size 8 \
             --learning-rate 5e-5 \
