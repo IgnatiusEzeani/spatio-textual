@@ -8,7 +8,7 @@ The humanities-facing product question is:
 
 ## Run locally
 
-From the repository root:
+From the repository root, the offline-safe/default path is:
 
 ```bash
 python -m pip install -e '.[app]'
@@ -16,7 +16,13 @@ python -m spacy download en_core_web_sm
 streamlit run projects/sh2026/demo/streamlit_app.py
 ```
 
-The default demo path is designed to remain useful without a provider API key.
+For optional live OpenAI journey extraction, also install the OpenAI client or install the repository `requirements.txt`:
+
+```bash
+python -m pip install 'openai>=1.0.0'
+```
+
+The hosted/default demo path remains fully useful without a provider API key.
 
 ## Reliability modes
 
