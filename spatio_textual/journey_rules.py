@@ -43,9 +43,13 @@ TRANSPORT_ALIASES = {
 
 # Capitalised place-like phrases after a journey preposition are a transparent
 # fallback when generic NER misses a place. Lower-case connectors support forms
-# such as "Dar es Salaam" without introducing a task-specific gazetteer. Case
-# insensitivity is applied only to the lexical cue, never to the place pattern.
-PLACE_PHRASE = r"[A-Z][\w'.-]*(?:\s+(?:(?:[A-Z][\w'.-]*)|(?:es|of|the|and))){0,3}"
+# such as "Dar es Salaam" without introducing a task-specific gazetteer. A
+# connector must be followed by another capitalised component, so phrases do not
+# absorb ordinary continuation text such as "Inverness and checked ...".
+PLACE_PHRASE = (
+    r"[A-Z][\w'.-]*"
+    r"(?:(?:\s+[A-Z][\w'.-]*)|(?:\s+(?:es|of|the|and)\s+[A-Z][\w'.-]*)){0,3}"
+)
 FROM_RE = re.compile(rf"\b(?i:from)\s+(?P<place>{PLACE_PHRASE})")
 TO_RE = re.compile(rf"\b(?i:to|toward|towards|into)\s+(?P<place>{PLACE_PHRASE})")
 ARRIVAL_RE = re.compile(rf"\b(?i:arrived|reached|settled|relocated)\s+(?i:in|at|to)\s+(?P<place>{PLACE_PHRASE})")
@@ -67,9 +71,9 @@ TIME_PATTERNS = [
     re.compile(r"^(?:At sunrise|At dawn|Late that evening|The following morning|Two days later)\b", re.I),
     re.compile(r"\bbefore noon\b", re.I),
     re.compile(r"\b(?:19|20)\d{2}\b"),
+    re.compile(rf"\b\d{{1,2}}\s+{MONTH}\b", re.I),
     re.compile(rf"\b{DAY}\b", re.I),
     re.compile(rf"\b{MONTH}\b", re.I),
-    re.compile(rf"\b\d{{1,2}}\s+{MONTH}\b", re.I),
 ]
 PURPOSE_TO_RE = re.compile(r"\bto\s+(visit|attend|deliver|meet|work|study|join|escape)\b[^,.;]*", re.I)
 FOR_REASON_RE = re.compile(r"\bfor\s+(?:an?\s+|the\s+)?[^,.;]+", re.I)
