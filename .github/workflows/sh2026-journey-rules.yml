@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "benchmarks/sh2026/build_journey_dev_v1.py"
-      - "docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md"
-      - "scripts/run_sh2026_rule_journey.py"
+      - "projects/sh2026/benchmarks/build_journey_dev_v1.py"
+      - "projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md"
+      - "projects/sh2026/scripts/run_sh2026_rule_journey.py"
       - "spatio_textual/journey_rules.py"
       - "spatio_textual/journey_benchmark.py"
       - "spatio_textual/journey_evaluation.py"
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build and validate separate journey development corpus
         run: |
-          python benchmarks/sh2026/build_journey_dev_v1.py --output sh2026_outputs/journey_rules/journey_dev_v1.jsonl
+          python projects/sh2026/benchmarks/build_journey_dev_v1.py --output sh2026_outputs/journey_rules/journey_dev_v1.jsonl
           ACTUAL=$(sha256sum sh2026_outputs/journey_rules/journey_dev_v1.jsonl | cut -d' ' -f1)
           test "$ACTUAL" = "$DEV_SHA256"
           python - <<'PY'
@@ -54,7 +54,7 @@ jobs:
 
       - name: Run development-only rule/dependency journey condition
         run: |
-          python scripts/run_sh2026_rule_journey.py \
+          python projects/sh2026/scripts/run_sh2026_rule_journey.py \
             sh2026_outputs/journey_rules/journey_dev_v1.jsonl \
             --spacy-model en_core_web_sm \
             --out-dir sh2026_outputs/journey_rules/development
@@ -80,6 +80,6 @@ jobs:
           name: sh2026-journey-rules-development-${{ github.run_id }}
           path: |
             sh2026_outputs/journey_rules/
-            docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md
+            projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md
           if-no-files-found: error
           retention-days: 30
