@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
 
       - name: Resolve formal rule journey trigger
         shell: bash
@@ -25,6 +26,14 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             SCOPE="formal_holdout"
           else
+            # GitHub PR path filters apply to the cumulative PR diff. Require the
+            # marker to be changed in the latest feature-branch commit as well,
+            # so an armed marker cannot cause repeated formal scoring on later
+            # unrelated commits.
+            if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -qx '.github/sh2026_journey_rule_scope'; then
+              echo "Latest commit did not change the formal marker; skipping formal journey scoring."
+              exit 0
+            fi
             SCOPE="$(tr -d '[:space:]' < .github/sh2026_journey_rule_scope)"
           fi
           test "$SCOPE" = "formal_holdout" || {
