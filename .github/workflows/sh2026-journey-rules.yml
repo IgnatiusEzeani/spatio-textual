@@ -1,11 +1,10 @@
-name: SH2026 rule journey benchmark
+name: SH2026 rule journey development
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "benchmarks/sh2026/build_journey_dev_v1.py"
-      - "benchmarks/sh2026/build_holdout_v1.py"
       - "docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md"
       - "scripts/run_sh2026_rule_journey.py"
       - "spatio_textual/journey_rules.py"
@@ -16,12 +15,11 @@ on:
       - ".github/workflows/sh2026-journey-rules.yml"
 
 jobs:
-  journey-rules:
+  journey-rules-development:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       DEV_SHA256: a5b89a40d0d0f7be1b3994852fa041c262ee56535d9ef400e50558d00666421b
-      HOLDOUT_SHA256: be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b
       SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -62,42 +60,24 @@ jobs:
             --out-dir sh2026_outputs/journey_rules/development
           cat sh2026_outputs/journey_rules/development/journey_summary.json
 
-      - name: Build and verify frozen formal holdout
-        run: |
-          python benchmarks/sh2026/build_holdout_v1.py
-          ACTUAL=$(sha256sum benchmarks/sh2026/holdout_v1.jsonl | cut -d' ' -f1)
-          test "$ACTUAL" = "$HOLDOUT_SHA256"
-
-      - name: Run frozen rule/dependency journey condition once
-        run: |
-          python scripts/run_sh2026_rule_journey.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
-            --spacy-model en_core_web_sm \
-            --benchmark-mode \
-            --frozen-at-commit "$SH2026_HEAD_SHA" \
-            --expected-sha256 "$HOLDOUT_SHA256" \
-            --out-dir sh2026_outputs/journey_rules/formal_holdout
-          cat sh2026_outputs/journey_rules/formal_holdout/journey_summary.json
-
-      - name: Record comparison provenance
+      - name: Record development provenance
         run: |
           cat > sh2026_outputs/journey_rules/provenance.json <<EOF
           {
-            "method": "rule_dependency_v1",
+            "method": "rule_dependency_v1_development",
             "spacy_model": "en_core_web_sm",
             "development_sha256": "$DEV_SHA256",
-            "formal_holdout_sha256": "$HOLDOUT_SHA256",
             "sh2026_branch_head_sha": "$SH2026_HEAD_SHA",
             "journey_match_policy": "sh2026-journey-match-v1",
             "journey_field_policy": "sh2026-journey-field-v1",
-            "tuning_policy": "development corpus only; frozen holdout not used for v1 rule changes"
+            "tuning_policy": "development corpus only; this workflow never evaluates the frozen formal holdout"
           }
           EOF
 
-      - name: Upload journey-rule audit artifact
+      - name: Upload development audit artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sh2026-journey-rules-v1-${{ github.run_id }}
+          name: sh2026-journey-rules-development-${{ github.run_id }}
           path: |
             sh2026_outputs/journey_rules/
             docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md
