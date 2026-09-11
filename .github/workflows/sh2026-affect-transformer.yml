@@ -1,8 +1,16 @@
 name: SH2026 affect transformer benchmark
 
 on:
-  pull_request:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "projects/sh2026/benchmarks/**"
+      - "projects/sh2026/scripts/run_sh2026_affect_transformer.py"
+      - "projects/sh2026/docs/AFFECT_EXPERIMENT_V1.md"
+      - "projects/sh2026/docs/AFFECT_TRANSFORMER_CONDITION_V1.md"
+      - "spatio_textual/affect_transformer.py"
+      - "spatio_textual/affect_benchmark.py"
+      - ".github/workflows/sh2026-affect-transformer.yml"
 
 permissions:
   contents: read
@@ -47,9 +55,9 @@ jobs:
 
       - name: Build and verify frozen affect corpora
         run: |
-          python benchmarks/sh2026/build_affect_v1.py
-          test "$(sha256sum benchmarks/sh2026/affect_dev_v1.jsonl | cut -d' ' -f1)" = "$DEV_SHA256"
-          test "$(sha256sum benchmarks/sh2026/affect_holdout_v1.jsonl | cut -d' ' -f1)" = "$HOLDOUT_SHA256"
+          python projects/sh2026/benchmarks/build_affect_v1.py
+          test "$(sha256sum projects/sh2026/benchmarks/affect_dev_v1.jsonl | cut -d' ' -f1)" = "$DEV_SHA256"
+          test "$(sha256sum projects/sh2026/benchmarks/affect_holdout_v1.jsonl | cut -d' ' -f1)" = "$HOLDOUT_SHA256"
 
       - name: Verify pinned Hugging Face revisions resolve exactly
         run: |
@@ -69,14 +77,14 @@ jobs:
 
       - name: Run frozen transformer condition on development set
         run: |
-          python scripts/run_sh2026_affect_transformer.py \
-            benchmarks/sh2026/affect_dev_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_affect_transformer.py \
+            projects/sh2026/benchmarks/affect_dev_v1.jsonl \
             --out-dir sh2026_outputs/affect_transformer/dev
 
       - name: Run first formal transformer affect holdout
         run: |
-          python scripts/run_sh2026_affect_transformer.py \
-            benchmarks/sh2026/affect_holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_affect_transformer.py \
+            projects/sh2026/benchmarks/affect_holdout_v1.jsonl \
             --benchmark-mode \
             --frozen-at-commit "$SH2026_HEAD_SHA" \
             --expected-sha256 "$HOLDOUT_SHA256" \
@@ -111,7 +119,7 @@ jobs:
           name: sh2026-affect-transformer-${{ github.run_id }}
           path: |
             sh2026_outputs/affect_transformer/
-            docs/sh2026/AFFECT_EXPERIMENT_V1.md
-            docs/sh2026/AFFECT_TRANSFORMER_CONDITION_V1.md
+            projects/sh2026/docs/AFFECT_EXPERIMENT_V1.md
+            projects/sh2026/docs/AFFECT_TRANSFORMER_CONDITION_V1.md
           if-no-files-found: error
           retention-days: 30
