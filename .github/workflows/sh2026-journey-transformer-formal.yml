@@ -113,12 +113,12 @@ jobs:
           ACTUAL=$(sha256sum benchmarks/sh2026/holdout_v1.jsonl | cut -d' ' -f1)
           test "$ACTUAL" = "$HOLDOUT_SHA256"
 
-      - name: Run first frozen transformer journey holdout evaluation
+      - name: Run frozen transformer journey holdout evaluation
         if: env.SH2026_RUN_FORMAL_TRANSFORMER_JOURNEY == '1'
         run: |
           python scripts/run_sh2026_transformer_journey.py \
             benchmarks/sh2026/holdout_v1.jsonl \
-            --model-path "$SH2026_FROZEN_MODEL_DIR" \
+            --model-dir "$SH2026_FROZEN_MODEL_DIR" \
             --max-length 256 \
             --benchmark-mode \
             --frozen-at-commit "$SH2026_HEAD_SHA" \
@@ -150,7 +150,7 @@ jobs:
             "evaluation_head_sha": "$SH2026_HEAD_SHA",
             "journey_match_policy": "sh2026-journey-match-v1",
             "journey_field_policy": "sh2026-journey-field-v1",
-            "freeze_note": "Fine-tuned checkpoint and inference assembly were frozen after development-only evaluation and before this formal holdout run."
+            "freeze_note": "Fine-tuned checkpoint and inference assembly were frozen after development-only evaluation and before formal holdout scoring. The preceding infrastructure attempt failed before model evaluation because of a CLI argument typo."
           }
           EOF
 
