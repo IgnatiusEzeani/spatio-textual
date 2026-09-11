@@ -5,7 +5,7 @@ on:
   pull_request:
     types: [synchronize]
     paths:
-      - ".github/sh2026_affect_llm_scope"
+      - "projects/sh2026/config/affect_llm_scope"
 
 permissions:
   contents: read
@@ -21,6 +21,7 @@ jobs:
       SH2026_REASONING_EFFORT: medium
       SH2026_MAX_OUTPUT_TOKENS: "2048"
       SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SH2026_SCOPE_FILE: projects/sh2026/config/affect_llm_scope
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,13 +35,13 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             SCOPE="formal_holdout"
           else
-            if ! git diff --name-only HEAD^ HEAD | grep -Fxq '.github/sh2026_affect_llm_scope'; then
+            if ! git diff --name-only HEAD^ HEAD | grep -Fxq "$SH2026_SCOPE_FILE"; then
               echo "run=false" >> "$GITHUB_OUTPUT"
               echo "scope=none" >> "$GITHUB_OUTPUT"
               echo "Marker was not changed by the latest commit; paid affect inference is intentionally skipped."
               exit 0
             fi
-            SCOPE="$(tr -d '[:space:]' < .github/sh2026_affect_llm_scope)"
+            SCOPE="$(tr -d '[:space:]' < "$SH2026_SCOPE_FILE")"
           fi
           if [ "$SCOPE" = "disabled" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -82,14 +83,14 @@ jobs:
       - name: Build and verify frozen affect holdout
         if: ${{ steps.scope.outputs.run == 'true' }}
         run: |
-          python benchmarks/sh2026/build_affect_v1.py
-          test "$(sha256sum benchmarks/sh2026/affect_holdout_v1.jsonl | cut -d' ' -f1)" = "$HOLDOUT_SHA256"
+          python projects/sh2026/benchmarks/build_affect_v1.py
+          test "$(sha256sum projects/sh2026/benchmarks/affect_holdout_v1.jsonl | cut -d' ' -f1)" = "$HOLDOUT_SHA256"
 
       - name: Generate frozen strict-schema LLM affect predictions
         if: ${{ steps.scope.outputs.run == 'true' }}
         run: |
-          python scripts/generate_sh2026_llm_affect_predictions.py \
-            benchmarks/sh2026/affect_holdout_v1.jsonl \
+          python projects/sh2026/scripts/generate_sh2026_llm_affect_predictions.py \
+            projects/sh2026/benchmarks/affect_holdout_v1.jsonl \
             --model "$SH2026_MODEL" \
             --reasoning-effort "$SH2026_REASONING_EFFORT" \
             --max-output-tokens "$SH2026_MAX_OUTPUT_TOKENS" \
@@ -125,8 +126,8 @@ jobs:
       - name: Score preserved affect predictions
         if: ${{ steps.scope.outputs.run == 'true' }}
         run: |
-          python scripts/run_sh2026_affect_benchmark.py \
-            benchmarks/sh2026/affect_holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_affect_benchmark.py \
+            projects/sh2026/benchmarks/affect_holdout_v1.jsonl \
             --predictions sh2026_outputs/llm_affect_formal/inference/affect_predictions.jsonl \
             --benchmark-mode \
             --frozen-at-commit "$SH2026_HEAD_SHA" \
@@ -160,7 +161,7 @@ jobs:
           name: sh2026-affect-llm-formal-${{ github.run_id }}
           path: |
             sh2026_outputs/llm_affect_formal/
-            docs/sh2026/AFFECT_EXPERIMENT_V1.md
-            docs/sh2026/AFFECT_LLM_CONDITION_V1.md
+            projects/sh2026/docs/AFFECT_EXPERIMENT_V1.md
+            projects/sh2026/docs/AFFECT_LLM_CONDITION_V1.md
           if-no-files-found: error
           retention-days: 30
