@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,27 @@ from spatio_textual.openai_responses import OpenAIResponsesJSONClient
 # pricing changes so cost can always be recomputed from the preserved artefact.
 INPUT_USD_PER_MTOK = 4.0
 OUTPUT_USD_PER_MTOK = 20.0
+
+# Infrastructure retry policy. This does not alter the frozen prompt, model,
+# reasoning setting or schema. It only retries transient transport/provider
+# failures that produced no usable model response.
+TRANSIENT_RETRY_DELAYS_SECONDS = (5, 10, 20, 40)
+TRANSIENT_ERROR_MARKERS = (
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+    "rate_limit",
+    "rate limit",
+    "service_unavailable",
+    "server_is_overloaded",
+    "overloaded",
+    "timeout",
+    "timed out",
+    "connection error",
+    "connection reset",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,6 +115,48 @@ def actual_usage(telemetry: list[dict[str, Any]]) -> tuple[int | None, int | Non
     return input_total, output_total, reasoning_total
 
 
+def _failure_messages(result: dict[str, Any]) -> list[str]:
+    telemetry = [row for row in result.get("telemetry", []) if isinstance(row, dict)]
+    return [str(row.get("error") or "") for row in telemetry if row.get("success") is False]
+
+
+def _is_transient_failure(messages: list[str]) -> bool:
+    if not messages:
+        return False
+    joined = " ".join(messages).lower()
+    return any(marker in joined for marker in TRANSIENT_ERROR_MARKERS)
+
+
+def _extract_with_transient_retry(
+    client: OpenAIResponsesJSONClient,
+    text: str,
+    *,
+    example_id: str,
+) -> tuple[dict[str, Any], int, list[str]]:
+    transient_failures: list[str] = []
+    attempts = 0
+    while True:
+        attempts += 1
+        result = extract_audited_journeys(client, text, file_id=example_id, seg_id=0)
+        failures = _failure_messages(result)
+        if not failures:
+            return result, attempts, transient_failures
+        if not _is_transient_failure(failures):
+            raise SystemExit(f"Provider failure for {example_id}: " + "; ".join(failures))
+        transient_failures.extend(failures)
+        retry_index = attempts - 1
+        if retry_index >= len(TRANSIENT_RETRY_DELAYS_SECONDS):
+            raise SystemExit(
+                f"Provider failure for {example_id} after {attempts} attempts: " + "; ".join(failures)
+            )
+        delay = TRANSIENT_RETRY_DELAYS_SECONDS[retry_index]
+        print(
+            f"Transient provider failure for {example_id} on attempt {attempts}; "
+            f"retrying unchanged request in {delay}s."
+        )
+        time.sleep(delay)
+
+
 def main() -> None:
     args = parse_args()
     if not os.getenv("OPENAI_API_KEY"):
@@ -125,18 +189,18 @@ def main() -> None:
     predictions: list[dict[str, Any]] = []
     all_telemetry: list[dict[str, Any]] = []
     resolved_models: set[str] = set()
+    total_provider_attempts = 0
+    transient_failure_count = 0
 
     for record in records:
         text = str(record["text"])
         example_id = str(record["example_id"])
-        result = extract_audited_journeys(client, text, file_id=example_id, seg_id=0)
+        result, provider_attempts, transient_failures = _extract_with_transient_retry(
+            client, text, example_id=example_id
+        )
+        total_provider_attempts += provider_attempts
+        transient_failure_count += len(transient_failures)
         telemetry = [row for row in result.get("telemetry", []) if isinstance(row, dict)]
-        failures = [row for row in telemetry if row.get("success") is False]
-        if failures:
-            raise SystemExit(
-                f"Provider failure for {example_id}: "
-                + "; ".join(str(row.get("error")) for row in failures)
-            )
         all_telemetry.extend(telemetry)
         response_metadata = result.get("response_metadata") or {}
         resolved_model = str(response_metadata.get("resolved_model") or args.model)
@@ -156,6 +220,8 @@ def main() -> None:
                 "requested_model": args.model,
                 "reasoning_effort": args.reasoning_effort,
                 "max_output_tokens": args.max_output_tokens,
+                "provider_attempts": provider_attempts,
+                "transient_provider_failures": transient_failures,
                 "journeys": result.get("journeys", []),
                 "telemetry": telemetry,
                 "raw_structured_response": result.get("raw_structured_response"),
@@ -198,6 +264,9 @@ def main() -> None:
         "prompt_policy": "spatio_textual.journeys.build_journey_prompt",
         "offset_policy": "model_returns_verbatim_evidence; software_computes_offsets",
         "repetitions": 1,
+        "transient_retry_policy_seconds": list(TRANSIENT_RETRY_DELAYS_SECONDS),
+        "total_provider_attempts": total_provider_attempts,
+        "transient_provider_failure_count": transient_failure_count,
         "actual_input_tokens": input_tokens,
         "actual_output_tokens": output_tokens,
         "actual_reasoning_tokens": reasoning_tokens,
@@ -213,8 +282,9 @@ def main() -> None:
             "preserved per prediction because a dated snapshot identifier was not assumed."
         ),
         "claim_boundary": (
-            "This is one observed run on the frozen synthetic SH2026 holdout. It measures the configured extraction condition; "
-            "it does not establish stochastic stability or archival-domain validity."
+            "This is one completed observed run on the frozen synthetic SH2026 holdout. Transient provider failures may be retried "
+            "with the unchanged request under the recorded infrastructure retry policy. The run measures the configured extraction "
+            "condition; it does not establish stochastic stability or archival-domain validity."
         ),
     }
     (args.out_dir / "inference_manifest.json").write_text(
