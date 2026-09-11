@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "benchmarks/sh2026/build_journey_dev_v1.py"
-      - "scripts/train_sh2026_journey_transformer.py"
-      - "scripts/run_sh2026_transformer_journey.py"
+      - "projects/sh2026/benchmarks/build_journey_dev_v1.py"
+      - "projects/sh2026/scripts/train_sh2026_journey_transformer.py"
+      - "projects/sh2026/scripts/run_sh2026_transformer_journey.py"
       - "spatio_textual/journey_transformer.py"
       - "spatio_textual/journey_benchmark.py"
       - "spatio_textual/journey_evaluation.py"
       - "tests/test_journey_transformer.py"
-      - "docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md"
+      - "projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md"
       - ".github/workflows/sh2026-journey-transformer-dev.yml"
 
 jobs:
@@ -50,13 +50,13 @@ jobs:
 
       - name: Build and verify frozen journey development corpus
         run: |
-          python benchmarks/sh2026/build_journey_dev_v1.py --output sh2026_outputs/journey_transformer_dev/journey_dev_v1.jsonl
+          python projects/sh2026/benchmarks/build_journey_dev_v1.py --output sh2026_outputs/journey_transformer_dev/journey_dev_v1.jsonl
           ACTUAL=$(sha256sum sh2026_outputs/journey_transformer_dev/journey_dev_v1.jsonl | cut -d' ' -f1)
           test "$ACTUAL" = "$DEV_SHA256"
 
       - name: Train and evaluate transformer event condition on development split only
         run: |
-          python scripts/train_sh2026_journey_transformer.py \
+          python projects/sh2026/scripts/train_sh2026_journey_transformer.py \
             sh2026_outputs/journey_transformer_dev/journey_dev_v1.jsonl \
             --base-model "$BASE_MODEL" \
             --revision "$BASE_REVISION" \
@@ -81,6 +81,6 @@ jobs:
           name: sh2026-journey-transformer-development-${{ github.run_id }}
           path: |
             sh2026_outputs/journey_transformer_dev/
-            docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md
+            projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md
           if-no-files-found: error
           retention-days: 30
