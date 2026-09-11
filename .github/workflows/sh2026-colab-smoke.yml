@@ -24,6 +24,11 @@ jobs:
         run: |
           sudo mkdir -p /content
           sudo chown "$USER":"$USER" /content
+          # The notebooks use /content/spatio-textual in Colab. In CI, point that
+          # path at the checked-out PR commit so smoke tests cannot accidentally
+          # clone and execute the older release branch instead of the code under review.
+          ln -sfn "$GITHUB_WORKSPACE" /content/spatio-textual
+          test "$(readlink -f /content/spatio-textual)" = "$(readlink -f "$GITHUB_WORKSPACE")"
           python -m pip install --upgrade pip
           python -m pip install -r requirements-lite.txt nbconvert ipykernel
           mkdir -p sh2026_outputs/notebook_smoke
