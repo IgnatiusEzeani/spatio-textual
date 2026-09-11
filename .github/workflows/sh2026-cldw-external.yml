@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "benchmarks/sh2026/cldw_external_manifest_v1.json"
-      - "benchmarks/sh2026/build_cldw_external_v1.py"
-      - "scripts/run_sh2026_external_ner.py"
+      - "projects/sh2026/benchmarks/cldw_external_manifest_v1.json"
+      - "projects/sh2026/benchmarks/build_cldw_external_v1.py"
+      - "projects/sh2026/scripts/run_sh2026_external_ner.py"
       - "spatio_textual/transformer_ner.py"
       - "spatio_textual/evaluation.py"
       - "spatio_textual/gold.py"
       - "spatio_textual/rules.py"
-      - "tutorials/sh2026/data/teaching_gazetteer.csv"
+      - "projects/sh2026/workshop/data/teaching_gazetteer.csv"
       - "tests/test_cldw_external_builder.py"
       - ".github/workflows/sh2026-cldw-external.yml"
 
@@ -26,8 +26,6 @@ jobs:
       EXPECTED_CLDW_SHA256: 257a463e8dd5b154edb7951c8b8bb6d05f609043db17adaa2324d7290b06836c
       SH2026_HF_MODEL: dslim/bert-base-NER
       SH2026_HF_REVISION: 0b95561fd0c304538b5eb8a0ee532ca24dd009b9
-      # github.sha is a synthetic merge commit for pull_request events. Record
-      # the actual feature-branch head so an artefact can be reproduced exactly.
       SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Check out SH2026 branch
@@ -68,7 +66,7 @@ jobs:
 
       - name: Build and checksum source-derived validation passages
         run: |
-          python benchmarks/sh2026/build_cldw_external_v1.py \
+          python projects/sh2026/benchmarks/build_cldw_external_v1.py \
             --upstream-root cldw_upstream \
             --output sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl
           cp sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl.sha256 \
@@ -83,7 +81,6 @@ jobs:
       - name: Validate derived gold and provenance
         run: |
           python - <<'PY'
-          import json
           from pathlib import Path
           from spatio_textual.gold import load_gold_jsonl, assert_valid_gold
 
@@ -103,7 +100,7 @@ jobs:
 
       - name: Run common-denominator named-place comparison
         run: |
-          python scripts/run_sh2026_external_ner.py \
+          python projects/sh2026/scripts/run_sh2026_external_ner.py \
             sh2026_outputs/cldw_external_v1/cldw_external_v1.jsonl \
             --methods rules,spacy,spacy_resources,hf \
             --spacy-model en_core_web_sm \
@@ -122,7 +119,7 @@ jobs:
             "cldw_repository": "UCREL/LakeDistrictCorpus",
             "cldw_commit": "$CLDW_COMMIT",
             "dataset_sha256": "$EXPECTED_CLDW_SHA256",
-            "selection_manifest": "benchmarks/sh2026/cldw_external_manifest_v1.json",
+            "selection_manifest": "projects/sh2026/benchmarks/cldw_external_manifest_v1.json",
             "selection_rule": "sh2026-cldw-paragraph-v1",
             "evaluation_scope": "TOPONYM recognition only",
             "match_policy": "exact_character_span_and_harmonized_TOPONYM_label",
@@ -140,7 +137,7 @@ jobs:
           name: sh2026-cldw-external-v1-${{ github.run_id }}
           path: |
             sh2026_outputs/cldw_external_v1/
-            benchmarks/sh2026/cldw_external_manifest_v1.json
-            docs/sh2026/EXTERNAL_VALIDATION_PROTOCOL.md
+            projects/sh2026/benchmarks/cldw_external_manifest_v1.json
+            projects/sh2026/docs/EXTERNAL_VALIDATION_PROTOCOL.md
           if-no-files-found: error
           retention-days: 30
