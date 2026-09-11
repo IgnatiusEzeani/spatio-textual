@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import pytest
+import spacy
 
 from spatio_textual.journey_rules import RuleDependencyJourneyExtractor
 
 
 @pytest.fixture(scope="module")
 def extractor():
+    # The package compatibility matrix intentionally installs only declared
+    # Python dependencies, not optional spaCy language-model assets. Dedicated
+    # SH2026 journey workflows install en_core_web_sm and therefore execute these
+    # integration tests. Skipping here keeps package compatibility distinct from
+    # external model availability while preserving strict extractor behaviour.
+    if not spacy.util.is_package("en_core_web_sm"):
+        pytest.skip("en_core_web_sm is an external model asset; tested in SH2026 journey workflows")
     return RuleDependencyJourneyExtractor("en_core_web_sm")
 
 
