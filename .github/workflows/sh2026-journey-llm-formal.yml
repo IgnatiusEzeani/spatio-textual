@@ -42,6 +42,12 @@ jobs:
             fi
             SCOPE="$(tr -d '[:space:]' < .github/sh2026_journey_llm_scope)"
           fi
+          if [ "$SCOPE" = "disabled" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "scope=disabled" >> "$GITHUB_OUTPUT"
+            echo "Formal LLM journey inference is disabled."
+            exit 0
+          fi
           test "$SCOPE" = "formal_holdout" || {
             echo "Invalid SH2026 LLM journey scope: $SCOPE" >&2
             exit 1
@@ -145,7 +151,8 @@ jobs:
             "holdout_sha256": "$HOLDOUT_SHA256",
             "sh2026_commit": "$SH2026_HEAD_SHA",
             "journey_match_policy": "sh2026-journey-match-v1",
-            "journey_field_policy": "sh2026-journey-field-v1"
+            "journey_field_policy": "sh2026-journey-field-v1",
+            "transient_retry_policy_seconds": [5, 10, 20, 40]
           }
           EOF
 
