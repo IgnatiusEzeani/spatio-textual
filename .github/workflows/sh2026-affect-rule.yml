@@ -11,8 +11,14 @@ jobs:
   affect-rule:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DEV_SHA256: 76844f4ea2febfe665b1f98abd938ef2176bca4e8d6ef6407f63f95100fb3529
+      HOLDOUT_SHA256: 7f5007218934855e1c5e6cd941c8099ca855d70a85819e569837e8da6b85cd4d
+      SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -23,11 +29,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
 
-      - name: Build deterministic affect corpora
+      - name: Build and verify frozen affect corpora
         run: |
           python benchmarks/sh2026/build_affect_v1.py
-          echo "DEV_SHA256=$(sha256sum benchmarks/sh2026/affect_dev_v1.jsonl | cut -d' ' -f1)" >> "$GITHUB_ENV"
-          echo "HOLDOUT_SHA256=$(sha256sum benchmarks/sh2026/affect_holdout_v1.jsonl | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          test "$(sha256sum benchmarks/sh2026/affect_dev_v1.jsonl | cut -d' ' -f1)" = "$DEV_SHA256"
+          test "$(sha256sum benchmarks/sh2026/affect_holdout_v1.jsonl | cut -d' ' -f1)" = "$HOLDOUT_SHA256"
           wc -l benchmarks/sh2026/affect_dev_v1.jsonl benchmarks/sh2026/affect_holdout_v1.jsonl
 
       - name: Verify corpus schema and counts
@@ -56,10 +62,13 @@ jobs:
             benchmarks/sh2026/affect_dev_v1.jsonl \
             --out-dir sh2026_outputs/affect_rule/dev
 
-      - name: Run first frozen rule baseline on holdout
+      - name: Run frozen rule baseline on formal holdout
         run: |
           python scripts/run_sh2026_affect_rule.py \
             benchmarks/sh2026/affect_holdout_v1.jsonl \
+            --benchmark-mode \
+            --frozen-at-commit "$SH2026_HEAD_SHA" \
+            --expected-sha256 "$HOLDOUT_SHA256" \
             --out-dir sh2026_outputs/affect_rule/holdout
           cat sh2026_outputs/affect_rule/holdout/affect_summary.json
 
@@ -73,8 +82,9 @@ jobs:
             "development_sha256": "$DEV_SHA256",
             "holdout_sha256": "$HOLDOUT_SHA256",
             "source_type": "instructor_authored_synthetic_public_safe",
-            "commit": "${{ github.event.pull_request.head.sha || github.sha }}",
-            "holdout_note": "Rule implementation was committed before the first holdout execution. No post-holdout tuning is permitted for the v1 rule condition."
+            "commit": "$SH2026_HEAD_SHA",
+            "first_holdout_run": "34579117306",
+            "holdout_note": "The v1 rule implementation was committed before first holdout execution and was not tuned after observing holdout results. This workflow reruns the identical condition with formal benchmark guards."
           }
           EOF
           cat sh2026_outputs/affect_rule/corpus_manifest.json
