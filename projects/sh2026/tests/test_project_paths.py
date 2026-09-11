@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -33,6 +34,17 @@ NOTEBOOK_LEGACY_SNIPPETS = (
     "benchmarks/sh2026/",
 )
 
+# Broader text-level audit for live project documentation and GitHub Actions.
+# The regexes deliberately avoid matching the new project-scoped forms such as
+# ``projects/sh2026/scripts/run_sh2026_benchmark.py``.
+LEGACY_TEXT_PATTERNS = (
+    re.compile(r"(?<!projects/sh2026/)tutorials/sh2026/"),
+    re.compile(r"(?<!projects/sh2026/)docs/sh2026/"),
+    re.compile(r"(?<!projects/sh2026/)benchmarks/sh2026/"),
+    re.compile(r"(?<!projects/sh2026/)scripts/(?:run|generate|train)_sh2026_"),
+    re.compile(r"(?<!projects/sh2026/demo/)sh2026_app\.py"),
+)
+
 
 def test_live_project_python_uses_project_scoped_runtime_paths():
     offenders: list[str] = []
@@ -63,3 +75,19 @@ def test_workshop_notebooks_use_project_scoped_paths():
                     f"{path.relative_to(REPO_ROOT)} cell {index}: {', '.join(hits)}"
                 )
     assert not offenders, "Legacy SH2026 paths remain in workshop notebooks:\n" + "\n".join(offenders)
+
+
+def test_live_docs_and_workflows_do_not_reference_removed_sh2026_paths():
+    candidates = list(PROJECT_ROOT.rglob("*.md"))
+    workflow_root = REPO_ROOT / ".github" / "workflows"
+    candidates.extend(workflow_root.glob("sh2026-*.yml"))
+    candidates.extend(workflow_root.glob("sh2026-*.yaml"))
+
+    offenders: list[str] = []
+    for path in sorted(set(candidates)):
+        text = path.read_text(encoding="utf-8")
+        hits = [pattern.pattern for pattern in LEGACY_TEXT_PATTERNS if pattern.search(text)]
+        if hits:
+            offenders.append(f"{path.relative_to(REPO_ROOT)}: {', '.join(hits)}")
+
+    assert not offenders, "Legacy SH2026 paths remain in live docs/workflows:\n" + "\n".join(offenders)
