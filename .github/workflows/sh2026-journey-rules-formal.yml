@@ -5,7 +5,7 @@ on:
   pull_request:
     types: [synchronize]
     paths:
-      - ".github/sh2026_journey_rule_scope"
+      - "projects/sh2026/config/journey_rule_scope"
 
 jobs:
   formal-rule-journey:
@@ -14,6 +14,7 @@ jobs:
     env:
       HOLDOUT_SHA256: be9c526af68230f22cb92507af69d8aacea8cbb5bd7ad5dfcf3d7c16767fdb9b
       SH2026_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SH2026_SCOPE_FILE: projects/sh2026/config/journey_rule_scope
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,15 +27,11 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             SCOPE="formal_holdout"
           else
-            # GitHub PR path filters apply to the cumulative PR diff. Require the
-            # marker to be changed in the latest feature-branch commit as well,
-            # so an armed marker cannot cause repeated formal scoring on later
-            # unrelated commits.
-            if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -qx '.github/sh2026_journey_rule_scope'; then
+            if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -qx "$SH2026_SCOPE_FILE"; then
               echo "Latest commit did not change the formal marker; skipping formal journey scoring."
               exit 0
             fi
-            SCOPE="$(tr -d '[:space:]' < .github/sh2026_journey_rule_scope)"
+            SCOPE="$(tr -d '[:space:]' < "$SH2026_SCOPE_FILE")"
           fi
           test "$SCOPE" = "formal_holdout" || {
             echo "Formal rule journey run not armed: $SCOPE"
@@ -59,15 +56,15 @@ jobs:
       - name: Build and verify frozen holdout
         if: env.SH2026_RUN_FORMAL_RULE_JOURNEY == '1'
         run: |
-          python benchmarks/sh2026/build_holdout_v1.py
-          ACTUAL=$(sha256sum benchmarks/sh2026/holdout_v1.jsonl | cut -d' ' -f1)
+          python projects/sh2026/benchmarks/build_holdout_v1.py
+          ACTUAL=$(sha256sum projects/sh2026/benchmarks/holdout_v1.jsonl | cut -d' ' -f1)
           test "$ACTUAL" = "$HOLDOUT_SHA256"
 
       - name: Run frozen rule/dependency journey condition
         if: env.SH2026_RUN_FORMAL_RULE_JOURNEY == '1'
         run: |
-          python scripts/run_sh2026_rule_journey.py \
-            benchmarks/sh2026/holdout_v1.jsonl \
+          python projects/sh2026/scripts/run_sh2026_rule_journey.py \
+            projects/sh2026/benchmarks/holdout_v1.jsonl \
             --spacy-model en_core_web_sm \
             --benchmark-mode \
             --frozen-at-commit "$SH2026_HEAD_SHA" \
@@ -97,6 +94,6 @@ jobs:
           name: sh2026-journey-rules-formal-${{ github.run_id }}
           path: |
             sh2026_outputs/journey_rules_formal/
-            docs/sh2026/JOURNEY_DEVELOPMENT_PROTOCOL.md
+            projects/sh2026/docs/JOURNEY_DEVELOPMENT_PROTOCOL.md
           if-no-files-found: error
           retention-days: 30
