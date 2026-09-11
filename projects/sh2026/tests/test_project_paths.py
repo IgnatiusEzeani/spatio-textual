@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -24,17 +25,41 @@ FORBIDDEN_RUNTIME_SNIPPETS = (
     'ROOT / "tutorials" / "sh2026"',
     "ROOT / 'tutorials' / 'sh2026'",
 )
+NOTEBOOK_LEGACY_SNIPPETS = (
+    '"tutorials"/"sh2026"',
+    "'tutorials'/'sh2026'",
+    "tutorials/sh2026/",
+    "docs/sh2026/",
+    "benchmarks/sh2026/",
+)
 
 
 def test_live_project_python_uses_project_scoped_runtime_paths():
     offenders: list[str] = []
     this_file = Path(__file__).resolve()
+    frozen = {p.resolve() for p in FROZEN_SPECS}
     for path in PROJECT_ROOT.rglob("*.py"):
         resolved = path.resolve()
-        if resolved == this_file or resolved in {p.resolve() for p in FROZEN_SPECS}:
+        if resolved == this_file or resolved in frozen:
             continue
         text = path.read_text(encoding="utf-8")
         hits = [marker for marker in FORBIDDEN_RUNTIME_SNIPPETS if marker in text]
         if hits:
             offenders.append(f"{path.relative_to(REPO_ROOT)}: {', '.join(hits)}")
     assert not offenders, "Legacy SH2026 runtime paths remain:\n" + "\n".join(offenders)
+
+
+def test_workshop_notebooks_use_project_scoped_paths():
+    offenders: list[str] = []
+    for path in sorted((PROJECT_ROOT / "workshop").glob("*.ipynb")):
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        for index, cell in enumerate(notebook.get("cells", [])):
+            source = cell.get("source", "")
+            if isinstance(source, list):
+                source = "".join(source)
+            hits = [marker for marker in NOTEBOOK_LEGACY_SNIPPETS if marker in str(source)]
+            if hits:
+                offenders.append(
+                    f"{path.relative_to(REPO_ROOT)} cell {index}: {', '.join(hits)}"
+                )
+    assert not offenders, "Legacy SH2026 paths remain in workshop notebooks:\n" + "\n".join(offenders)
