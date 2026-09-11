@@ -12,7 +12,7 @@ on:
       - "spatio_textual/gold.py"
       - "spatio_textual/rules.py"
       - "projects/sh2026/workshop/data/teaching_gazetteer.csv"
-      - "tests/test_cldw_external_builder.py"
+      - "projects/sh2026/tests/test_cldw_external_builder.py"
       - ".github/workflows/sh2026-cldw-external.yml"
 
 jobs:
