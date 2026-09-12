@@ -153,6 +153,22 @@ def test_no_journey_response_is_valid_and_not_forced_into_schema():
     assert out["requires_review"] is False
 
 
+def test_extractor_propagates_failed_request_as_backend_error():
+    class FailedClient:
+        provider = "fake"
+        model = "failed-model"
+
+        def complete_json(self, task, prompt, *, input_text=None):
+            return {"telemetry": {"success": False, "error": "timeout"}}
+
+    out = JourneyExtractor(FailedClient()).extract(SOURCE, file_id="failed")
+    assert out["journeys"] == []
+    assert out["backend_error"] is True
+    assert out["review_reasons"] == ["backend_error"]
+    assert out["requires_review"] is True
+    assert any("timeout" in note for note in out["review_notes"])
+
+
 def test_non_list_journey_payload_is_rejected_at_top_level():
     client = FakeStructuredClient({"journeys": {"start_location": "London"}})
     out = JourneyExtractor(client).extract(SOURCE, file_id="bad")

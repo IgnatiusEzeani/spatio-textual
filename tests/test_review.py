@@ -107,3 +107,21 @@ def test_place_name_correction_clears_geometry_and_preserves_audit():
     accepted = apply_place_review(entity, action='accept')
     assert accepted['lat'] == 52.2
     assert accepted['resolved_name'] == 'Cambridge'
+
+
+def test_place_name_correction_normalizes_action_before_clearing_geometry():
+    from spatio_textual.review import apply_place_review
+
+    entity = {
+        "resolved_name": "Cambridge", "lat": 52.2, "lon": 0.12,
+        "resolution_status": "resolved", "requires_review": True,
+    }
+    result = apply_place_review(
+        entity, action=" Edit ", field="resolved_name",
+        new_value="Cambridge, Massachusetts",
+    )
+    assert result["resolved_name"] == "Cambridge, Massachusetts"
+    assert result["lat"] is None
+    assert result["lon"] is None
+    assert result["resolution_status"] == "unresolved"
+    assert result["requires_review"] is True

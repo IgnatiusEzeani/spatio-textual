@@ -99,7 +99,8 @@ def candidate_journey_match(
     overlap = evidence_iou(reference, predicted)
     all_expected_endpoints_match = endpoint_expected > 0 and endpoint_matches == endpoint_expected
     evidence_supported_partial = overlap >= evidence_threshold and endpoint_matches >= 1
-    eligible = all_expected_endpoints_match or evidence_supported_partial
+    evidence_only_match = endpoint_expected == 0 and overlap >= evidence_threshold
+    eligible = all_expected_endpoints_match or evidence_supported_partial or evidence_only_match
 
     exact_quote = False
     ref_quote = reference.get("evidence_quote")
@@ -122,6 +123,8 @@ def candidate_journey_match(
             if all_expected_endpoints_match
             else "evidence_overlap_plus_endpoint"
             if evidence_supported_partial
+            else "evidence_overlap_no_endpoints"
+            if evidence_only_match
             else "not_eligible"
         ),
     }

@@ -1,3 +1,5 @@
+import pytest
+
 from spatio_textual.affect_benchmark import evaluate_affect_predictions, score_multilabel, score_single_label
 from spatio_textual.affect_rules import classify_affect_rule
 
@@ -77,3 +79,17 @@ def test_affect_evaluation_records_representational_ceiling_and_grounding():
     result = evaluate_affect_predictions(refs, preds, representable_emotion_labels=["fear", "joy"])
     assert result["evidence_grounded_rate"] == 1.0
     assert result["emotion_representational_ceiling"] == 0.0
+
+
+def test_affect_evaluation_rejects_backend_failures():
+    refs = [{
+        "example_id": "failed", "text": "A plain sentence.",
+        "sentiment_label": "neutral", "emotion_labels": [],
+    }]
+    preds = [{
+        "example_id": "failed", "sentiment_label": "neutral", "emotion_labels": [],
+        "backend_error": True,
+        "telemetry": [{"success": False, "error": "provider unavailable"}],
+    }]
+    with pytest.raises(ValueError, match="backend failures.*failed"):
+        evaluate_affect_predictions(refs, preds)

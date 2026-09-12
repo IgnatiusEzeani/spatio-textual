@@ -114,6 +114,14 @@ def _ground_quote(text: str, quote: str | None) -> tuple[int | None, int | None,
     return None, None, "ambiguous", ["Evidence quote occurs multiple times in the source text."]
 
 
+def _backend_error(telemetry: Any) -> str | None:
+    """Return an auditable error note when structured inference failed."""
+    if not isinstance(telemetry, dict) or telemetry.get("success") is not False:
+        return None
+    detail = str(telemetry.get("error") or "unspecified provider error").strip()
+    return f"backend_error: LLM affect request failed: {detail}"
+
+
 def extract_audited_affect(
     client: StructuredAffectClient,
     text: str,
@@ -134,6 +142,9 @@ def extract_audited_affect(
     notes = [str(x) for x in (data.get("notes") or [])]
 
     start, end, grounding_status, review_notes = _ground_quote(text, quote)
+    backend_error = _backend_error(telemetry)
+    if backend_error:
+        review_notes.append(backend_error)
     if (sentiment != "neutral" or emotions) and quote is None:
         review_notes.append("Non-neutral affect classification has no evidence quote.")
     if not emotions and status == "contextual_inference":
@@ -155,6 +166,8 @@ def extract_audited_affect(
         "confidence": confidence,
         "notes": notes,
         "requires_review": bool(review_notes),
+        "review_reasons": ["backend_error"] if backend_error else [],
+        "backend_error": backend_error is not None,
         "review_notes": review_notes,
         "telemetry": [] if telemetry is None else [telemetry],
         "raw_structured_response": data,

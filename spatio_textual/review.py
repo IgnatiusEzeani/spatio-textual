@@ -84,7 +84,8 @@ def apply_place_review(record: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
     resolution in the append-only edit trail and keep the place reviewable.
     """
     out = apply_human_review(record, **kwargs)
-    if kwargs.get("action") != "edit" or kwargs.get("field") != "resolved_name":
+    action = str(kwargs.get("action") or "").strip().lower()
+    if action != "edit" or kwargs.get("field") != "resolved_name":
         return out
     cleared = {
         "lat": None, "lon": None, "latitude": None, "longitude": None,

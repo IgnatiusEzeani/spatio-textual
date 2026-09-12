@@ -76,3 +76,19 @@ def test_audited_journey_extraction_preserves_raw_and_grounds_evidence():
     assert result["raw_response_text"] == '{"journeys":[]}'
     assert result["response_metadata"]["response_id"] == "resp_test"
     assert result["telemetry"][0]["success"] is True
+
+
+def test_failed_journey_request_is_not_a_valid_empty_response():
+    class _FailedClient:
+        provider = "openai"
+        model = "gpt-test"
+
+        def complete_json(self, task, prompt, *, input_text=None):
+            return {"telemetry": {"success": False, "error": "provider unavailable"}}
+
+    result = extract_audited_journeys(_FailedClient(), "We went home.", file_id="failed")
+    assert result["journeys"] == []
+    assert result["backend_error"] is True
+    assert result["requires_review"] is True
+    assert result["review_reasons"] == ["backend_error"]
+    assert any("provider unavailable" in note for note in result["review_notes"])

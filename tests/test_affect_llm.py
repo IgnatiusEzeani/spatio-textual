@@ -73,3 +73,18 @@ def test_contextual_affect_is_routed_to_review():
     assert result["evidence_grounding_status"] == "grounded"
     assert result["requires_review"] is True
     assert any("Contextual affect inference" in note for note in result["review_notes"])
+
+
+def test_failed_affect_request_is_not_a_valid_neutral_prediction():
+    class _FailedClient:
+        provider = "openai"
+        model = "gpt-test"
+
+        def complete_json(self, task, prompt, *, input_text=None):
+            return {"telemetry": {"success": False, "error": "provider unavailable"}}
+
+    result = extract_audited_affect(_FailedClient(), "A plain sentence.", example_id="failed")
+    assert result["backend_error"] is True
+    assert result["requires_review"] is True
+    assert result["review_reasons"] == ["backend_error"]
+    assert any("provider unavailable" in note for note in result["review_notes"])

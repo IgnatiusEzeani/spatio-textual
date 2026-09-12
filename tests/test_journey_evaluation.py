@@ -58,6 +58,18 @@ def test_unrelated_destination_is_not_match():
     assert candidate_journey_match(ref, pred)["eligible"] is False
 
 
+def test_evidence_only_reference_matches_by_grounded_span():
+    ref = _journey(None, None, 10, 40, quote="the same movement evidence")
+    pred = _journey(None, None, 10, 40, quote="the same movement evidence")
+    detail = candidate_journey_match(ref, pred)
+    assert detail["eligible"] is True
+    assert detail["eligibility_reason"] == "evidence_overlap_no_endpoints"
+    result = match_journeys([pred], [ref])
+    assert result["tp"] == 1
+    assert result["fp"] == 0
+    assert result["fn"] == 0
+
+
 def test_matching_is_one_to_one_and_reports_unmatched_records():
     refs = [
         _journey("A", "B", 0, 20),

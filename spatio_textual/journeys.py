@@ -259,6 +259,11 @@ class JourneyExtractor:
         telemetry = data.pop("telemetry", None)
         raw_journeys = data.get("journeys", [])
         top_level_notes: list[str] = []
+        backend_error = None
+        if isinstance(telemetry, dict) and telemetry.get("success") is False:
+            detail = str(telemetry.get("error") or "unspecified provider error").strip()
+            backend_error = f"backend_error: LLM journey request failed: {detail}"
+            top_level_notes.append(backend_error)
         if not isinstance(raw_journeys, list):
             top_level_notes.append("LLM response field 'journeys' was not a list; no journeys accepted.")
             raw_journeys = []
@@ -291,6 +296,8 @@ class JourneyExtractor:
             "telemetry": telemetry_list,
             "requires_review": bool(top_level_notes) or any(j.get("requires_review") for j in journeys),
             "review_notes": top_level_notes,
+            "review_reasons": ["backend_error"] if backend_error else [],
+            "backend_error": backend_error is not None,
         }
 
 

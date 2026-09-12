@@ -116,6 +116,24 @@ def evaluate_affect_predictions(
         raise ValueError(f"prediction/reference ID mismatch: missing={missing}, extras={extras}")
 
     ordered_predictions = [pred_by_id[str(row["example_id"])] for row in references]
+    failed_ids = [
+        str(row["example_id"])
+        for row in ordered_predictions
+        if row.get("backend_error") is True
+        or any(
+            isinstance(item, dict) and item.get("success") is False
+            for item in (
+                row.get("telemetry")
+                if isinstance(row.get("telemetry"), list)
+                else [row.get("telemetry")]
+            )
+        )
+    ]
+    if failed_ids:
+        raise ValueError(
+            "Cannot score affect predictions containing backend failures; "
+            f"failed example_ids={failed_ids}"
+        )
     sentiment = score_single_label(
         [str(row["sentiment_label"]) for row in references],
         [str(row.get("sentiment_label") or "neutral") for row in ordered_predictions],
