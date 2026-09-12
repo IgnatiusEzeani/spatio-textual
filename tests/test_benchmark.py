@@ -15,6 +15,9 @@ def test_summarize_telemetry_preserves_missing_cost():
     assert summary["latency_ms_total"] == 30.0
     assert summary["latency_ms_mean"] == 15.0
     assert summary["cost_usd_est_total"] is None
+    assert summary["latency_ms_known_calls"] == 2
+    assert summary["input_tokens_est_known_calls"] == 2
+    assert summary["output_tokens_est_known_calls"] == 2
     assert summary["success_rate"] == 1.0
 
 

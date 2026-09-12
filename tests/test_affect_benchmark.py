@@ -93,3 +93,16 @@ def test_affect_evaluation_rejects_backend_failures():
     }]
     with pytest.raises(ValueError, match="backend failures.*failed"):
         evaluate_affect_predictions(refs, preds)
+
+
+def test_affect_evaluation_rejects_malformed_responses():
+    refs = [{
+        "example_id": "bad", "text": "A plain sentence.",
+        "sentiment_label": "neutral", "emotion_labels": [],
+    }]
+    preds = [{
+        "example_id": "bad", "sentiment_label": "neutral", "emotion_labels": [],
+        "invalid_response": True,
+    }]
+    with pytest.raises(ValueError, match="malformed responses.*bad"):
+        evaluate_affect_predictions(refs, preds)

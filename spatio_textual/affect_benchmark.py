@@ -129,10 +129,11 @@ def evaluate_affect_predictions(
             )
         )
     ]
-    if failed_ids:
+    invalid_ids = [str(row["example_id"]) for row in ordered_predictions if row.get("invalid_response") is True]
+    if failed_ids or invalid_ids:
         raise ValueError(
-            "Cannot score affect predictions containing backend failures; "
-            f"failed example_ids={failed_ids}"
+            "Cannot score invalid affect predictions; "
+            f"backend failures={failed_ids}, malformed responses={invalid_ids}"
         )
     sentiment = score_single_label(
         [str(row["sentiment_label"]) for row in references],

@@ -242,6 +242,17 @@ class LLMSpanExtractor:
         response_meta = data.pop("_response_metadata", None)
         raw_spans = data.get("spans", [])
         review_notes: list[str] = []
+        telemetry_rows = [telemetry] if isinstance(telemetry, dict) else (list(telemetry) if isinstance(telemetry, list) else [])
+        backend_error = next(
+            (
+                f"backend_error: LLM span request failed: {str(item.get('error') or 'unspecified provider error').strip()}"
+                for item in telemetry_rows
+                if isinstance(item, dict) and item.get("success") is False
+            ),
+            None,
+        )
+        if backend_error:
+            review_notes.append(backend_error)
         if not isinstance(raw_spans, list):
             raw_spans = []
             review_notes.append("Model response `spans` was not a list.")
@@ -260,7 +271,8 @@ class LLMSpanExtractor:
         ]
         if len(spans) != len(raw_spans):
             review_notes.append("One or more non-object span proposals were ignored.")
-        telemetry_rows = [telemetry] if isinstance(telemetry, dict) else (list(telemetry) if isinstance(telemetry, list) else [])
+        audit = span_audit_metrics(spans)
+        audit["backend_error"] = backend_error is not None
         return {
             "schema_version": "spatio-textual-llm-spans-v1",
             "allowed_labels": list(self.allowed_labels),
@@ -269,8 +281,10 @@ class LLMSpanExtractor:
             "raw_response_text": raw_text,
             "response_metadata": response_meta,
             "telemetry": telemetry_rows,
-            "audit": span_audit_metrics(spans),
+            "audit": audit,
             "requires_review": bool(review_notes) or any(x.get("requires_review") for x in spans),
+            "review_reasons": ["backend_error"] if backend_error else [],
+            "backend_error": backend_error is not None,
             "review_notes": review_notes,
             "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         }

@@ -1,3 +1,5 @@
+import pytest
+
 from spatio_textual.journey_benchmark import (
     aggregate_journey_benchmark_rows,
     journey_benchmark_row,
@@ -100,3 +102,35 @@ def test_both_missing_fields_do_not_inflate_pooled_field_precision_recall():
     assert totals["both_missing"] == 2
     assert totals["precision"] == 1.0
     assert totals["recall"] == 0.666667
+
+
+def test_journey_benchmark_rejects_backend_failure():
+    with pytest.raises(ValueError, match="backend failure.*failed"):
+        journey_benchmark_row(
+            example_id="failed", predicted=[], reference=[],
+            telemetry=[{"success": False, "error": "timeout"}],
+        )
+
+
+def test_pooled_telemetry_preserves_unknown_measurements():
+    known = journey_benchmark_row(
+        example_id="known", predicted=[], reference=[],
+        telemetry=[{
+            "success": True, "latency_ms": 10.0,
+            "input_tokens_est": 4, "output_tokens_est": 2,
+        }],
+    )
+    unknown = journey_benchmark_row(
+        example_id="unknown", predicted=[], reference=[],
+        telemetry=[{
+            "success": True, "latency_ms": None,
+            "input_tokens_est": None, "output_tokens_est": None,
+        }],
+    )
+    summary = aggregate_journey_benchmark_rows([known, unknown])
+    assert summary["telemetry"]["calls"] == 2
+    assert summary["telemetry"]["latency_ms_known_calls"] == 1
+    assert summary["telemetry"]["latency_ms_total"] is None
+    assert summary["telemetry"]["latency_ms_mean_per_call"] is None
+    assert summary["telemetry"]["input_tokens_est_total"] is None
+    assert summary["telemetry"]["output_tokens_est_total"] is None

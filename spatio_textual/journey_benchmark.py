@@ -21,11 +21,14 @@ def journey_benchmark_row(
     review burden and telemetry are kept separate. This prevents a fluent but
     weakly grounded structured output from being collapsed into a single score.
     """
+    telemetry_rows = [row for row in telemetry if isinstance(row, dict)]
+    if any(row.get("success") is False for row in telemetry_rows):
+        raise ValueError(f"Cannot score journey backend failure for example_id={example_id!r}")
     evaluation = evaluate_journeys(predicted, reference)
     matching = evaluation["matching"]
     field_scoring = evaluation["field_scoring"]
     audit = journey_audit_metrics(predicted)
-    tel = summarize_telemetry(telemetry)
+    tel = summarize_telemetry(telemetry_rows)
     return {
         "example_id": example_id,
         "provider": provider,
@@ -122,10 +125,25 @@ def aggregate_journey_benchmark_rows(rows: Iterable[dict[str, Any]]) -> dict[str
     inferred_total = sum(int(row.get("journeys_with_contextual_inference") or 0) for row in items)
 
     telemetry_rows = [row.get("telemetry_summary") or {} for row in items]
-    latency_total = sum(float(row.get("latency_ms_total") or 0.0) for row in telemetry_rows)
     calls_total = sum(int(row.get("calls") or 0) for row in telemetry_rows)
-    input_tokens_total = sum(int(row.get("input_tokens_est_total") or 0) for row in telemetry_rows)
-    output_tokens_total = sum(int(row.get("output_tokens_est_total") or 0) for row in telemetry_rows)
+    latency_known = sum(int(row.get("latency_ms_known_calls") or 0) for row in telemetry_rows)
+    input_known = sum(int(row.get("input_tokens_est_known_calls") or 0) for row in telemetry_rows)
+    output_known = sum(int(row.get("output_tokens_est_known_calls") or 0) for row in telemetry_rows)
+    latency_total = (
+        sum(float(row["latency_ms_total"]) for row in telemetry_rows)
+        if calls_total and latency_known == calls_total
+        else None
+    )
+    input_tokens_total = (
+        sum(int(row["input_tokens_est_total"]) for row in telemetry_rows)
+        if calls_total and input_known == calls_total
+        else None
+    )
+    output_tokens_total = (
+        sum(int(row["output_tokens_est_total"]) for row in telemetry_rows)
+        if calls_total and output_known == calls_total
+        else None
+    )
     known_costs = [row.get("cost_usd_est_total") for row in telemetry_rows if row.get("cost_usd_est_total") is not None]
 
     return {
@@ -165,10 +183,13 @@ def aggregate_journey_benchmark_rows(rows: Iterable[dict[str, Any]]) -> dict[str
         },
         "telemetry": {
             "calls": calls_total,
-            "latency_ms_total": round(latency_total, 3) if calls_total else None,
-            "latency_ms_mean_per_call": round(latency_total / calls_total, 3) if calls_total else None,
-            "input_tokens_est_total": input_tokens_total if calls_total else None,
-            "output_tokens_est_total": output_tokens_total if calls_total else None,
+            "latency_ms_total": round(latency_total, 3) if latency_total is not None else None,
+            "latency_ms_mean_per_call": round(latency_total / calls_total, 3) if latency_total is not None else None,
+            "latency_ms_known_calls": latency_known,
+            "input_tokens_est_total": input_tokens_total,
+            "input_tokens_est_known_calls": input_known,
+            "output_tokens_est_total": output_tokens_total,
+            "output_tokens_est_known_calls": output_known,
             "cost_usd_est_total": round(sum(float(x) for x in known_costs), 8) if known_costs else None,
             "cost_note": "Cost remains null unless the provider adapter supplies an estimate; token counts are estimates.",
         },

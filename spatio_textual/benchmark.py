@@ -19,8 +19,11 @@ def summarize_telemetry(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
         "calls": len(items),
         "latency_ms_total": round(sum(latency), 3) if latency else None,
         "latency_ms_mean": round(mean(latency), 3) if latency else None,
+        "latency_ms_known_calls": len(latency),
         "input_tokens_est_total": sum(input_tokens) if input_tokens else None,
+        "input_tokens_est_known_calls": len(input_tokens),
         "output_tokens_est_total": sum(output_tokens) if output_tokens else None,
+        "output_tokens_est_known_calls": len(output_tokens),
         "cost_usd_est_total": round(sum(costs), 8) if costs else None,
         "success_rate": round(sum(successes) / len(successes), 6) if successes else None,
     }

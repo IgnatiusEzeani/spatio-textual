@@ -134,15 +134,66 @@ def extract_audited_affect(
     raw_response_text = data.pop("_raw_response_text", None)
     response_metadata = data.pop("_response_metadata", None)
 
-    sentiment = str(data.get("sentiment") or "neutral").lower()
-    emotions = [str(x).lower() for x in (data.get("emotion_labels") or [])]
-    quote = data.get("evidence_quote")
-    status = str(data.get("explicit_or_inferred") or "none")
-    confidence = data.get("confidence")
-    notes = [str(x) for x in (data.get("notes") or [])]
-
-    start, end, grounding_status, review_notes = _ground_quote(text, quote)
     backend_error = _backend_error(telemetry)
+    review_notes: list[str] = []
+    invalid_response = False
+
+    raw_sentiment = data.get("sentiment")
+    sentiment = raw_sentiment.strip().lower() if isinstance(raw_sentiment, str) else "neutral"
+    if not backend_error and sentiment not in SENTIMENT_LABELS:
+        review_notes.append(f"Invalid sentiment label {raw_sentiment!r}; treated as neutral.")
+        sentiment = "neutral"
+        invalid_response = True
+
+    raw_emotions = data.get("emotion_labels")
+    emotions: list[str] = []
+    if isinstance(raw_emotions, list):
+        for value in raw_emotions:
+            label = value.strip().lower() if isinstance(value, str) else ""
+            if label in EMOTION_LABELS:
+                emotions.append(label)
+            elif not backend_error:
+                review_notes.append(f"Invalid emotion label {value!r}; discarded.")
+                invalid_response = True
+    elif raw_emotions is not None and not backend_error:
+        review_notes.append("emotion_labels must be a list; invalid value discarded.")
+        invalid_response = True
+
+    quote = data.get("evidence_quote")
+    if quote is not None and not isinstance(quote, str):
+        if not backend_error:
+            review_notes.append("evidence_quote must be a string or null; invalid value discarded.")
+            invalid_response = True
+        quote = None
+
+    raw_status = data.get("explicit_or_inferred")
+    status = raw_status.strip().lower() if isinstance(raw_status, str) else "none"
+    if not backend_error and status not in {"explicit", "contextual_inference", "none"}:
+        review_notes.append(f"Invalid explicit_or_inferred value {raw_status!r}; treated as none.")
+        status = "none"
+        invalid_response = True
+
+    confidence = data.get("confidence")
+    if confidence is not None and (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, (int, float))
+        or not 0.0 <= float(confidence) <= 1.0
+    ):
+        if not backend_error:
+            review_notes.append(f"Invalid confidence {confidence!r}; stored as null.")
+            invalid_response = True
+        confidence = None
+
+    raw_notes = data.get("notes")
+    notes = [value for value in raw_notes if isinstance(value, str)] if isinstance(raw_notes, list) else []
+    if raw_notes is not None and (
+        not isinstance(raw_notes, list) or len(notes) != len(raw_notes)
+    ) and not backend_error:
+        review_notes.append("notes must be a list of strings; invalid values discarded.")
+        invalid_response = True
+
+    start, end, grounding_status, grounding_notes = _ground_quote(text, quote)
+    review_notes.extend(grounding_notes)
     if backend_error:
         review_notes.append(backend_error)
     if (sentiment != "neutral" or emotions) and quote is None:
@@ -166,8 +217,9 @@ def extract_audited_affect(
         "confidence": confidence,
         "notes": notes,
         "requires_review": bool(review_notes),
-        "review_reasons": ["backend_error"] if backend_error else [],
+        "review_reasons": (["backend_error"] if backend_error else []) + (["invalid_response"] if invalid_response else []),
         "backend_error": backend_error is not None,
+        "invalid_response": invalid_response,
         "review_notes": review_notes,
         "telemetry": [] if telemetry is None else [telemetry],
         "raw_structured_response": data,

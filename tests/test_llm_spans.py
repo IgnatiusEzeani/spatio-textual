@@ -153,3 +153,20 @@ def test_span_audit_separates_grounding_and_review():
     assert audit["unsupported_rate"] == 0.5
     assert audit["requires_review_rate"] == 0.5
     assert audit["invalid_label_rate"] == 0.5
+
+
+def test_failed_span_request_is_not_a_valid_empty_prediction():
+    class FailedClient:
+        provider = "fake"
+        model = "failed-model"
+
+        def complete_json(self, task, prompt, *, input_text=None):
+            return {"telemetry": {"success": False, "error": "provider unavailable"}}
+
+    result = LLMSpanExtractor(FailedClient()).extract("We reached Paris.", file_id="failed")
+    assert result["spans"] == []
+    assert result["backend_error"] is True
+    assert result["requires_review"] is True
+    assert result["review_reasons"] == ["backend_error"]
+    assert result["audit"]["backend_error"] is True
+    assert any("provider unavailable" in note for note in result["review_notes"])
