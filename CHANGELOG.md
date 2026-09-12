@@ -16,6 +16,12 @@
 ### Fixed
 - Editing a resolved place invalidates stale coordinates while retaining the
   original values in the human-review audit trail.
+- Failed LLM affect and journey requests are recorded as backend errors rather
+  than valid neutral or empty predictions.
+- Affect evaluation refuses to score backend failures.
+- Evidence-only journey references can match on grounded evidence spans.
+- The Python 3.9 dependency path remains compatible with the tutorial spaCy
+  model wheel.
 
 ### Migration notes
 - Reference records now use `schema_version: spatio-textual-gold-0.1`.
